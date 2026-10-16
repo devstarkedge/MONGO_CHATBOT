@@ -1,0 +1,153 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mongo RAG</title>
+  <link rel="stylesheet" href="{% static 'rag/app.css' %}">
+</head>
+<body>
+  <div class="bg" aria-hidden="true"><i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i></div>
+
+  <div class="frame">
+    <header class="topbar">
+      <a class="brand" href="#chat" aria-label="Mongo RAG home">
+        <span class="orb">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 2.5l8.2 4.75v9.5L12 21.5l-8.2-4.75v-9.5z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.2" fill="#fff"/></svg>
+        </span>
+        <span class="brand-name">Mongo RAG</span>
+      </a>
+
+      <nav class="tabs" aria-label="Sections">
+        <button type="button" class="tab" data-view="chat"><span class="spark"></span>Chat</button>
+        <button type="button" class="tab" data-view="search"><span class="spark"></span>Search</button>
+        <button type="button" class="tab" data-view="data"><span class="spark"></span>Index</button>
+      </nav>
+
+      <button type="button" id="statusPill" class="status-pill" data-state="loading" title="Open index details">
+        <i class="dot"></i><span id="statusText">Checking index…</span>
+      </button>
+    </header>
+
+    <main class="stage">
+      <!-- ============================== CHAT ============================== -->
+      <section id="view-chat" class="view chat-layout is-empty" aria-label="Chat">
+        <aside id="chatSidebar" class="chat-sidebar">
+          <div class="sidebar-header">
+            <button type="button" id="sidebarNewChat" class="btn-sidebar-new">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              New chat
+            </button>
+            <button type="button" id="sidebarToggle" class="sidebar-toggle" aria-label="Toggle sidebar" title="Toggle sidebar">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
+            </button>
+          </div>
+          <div class="sidebar-title">Recent Chats</div>
+          <div id="chatHistoryList" class="chat-history-list" aria-label="Chat history"></div>
+        </aside>
+
+        <div class="chat-main">
+          <button type="button" id="sidebarOpen" class="sidebar-open-btn" aria-label="Open sidebar" title="Open chat history">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
+          </button>
+          <div class="hero">
+          <span class="hero-orb">
+            <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M12 2.5l8.2 4.75v9.5L12 21.5l-8.2-4.75v-9.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/></svg>
+          </span>
+          <h1>Hi, I'm your Assistant</h1>
+          <p>Ask anything about your MongoDB data. I answer only from your records.</p>
+        </div>
+
+        <div id="thread" class="thread" aria-live="polite">
+          <div id="threadInner" class="thread-inner"></div>
+        </div>
+
+        <div class="dock">
+          <form id="composer" class="composer" autocomplete="off">
+            <label class="sr-only" for="question">Your question</label>
+            <textarea id="question" rows="2" maxlength="500" placeholder="Ask anything…"></textarea>
+            <div class="composer-bar">
+              <div class="toggles">
+                <button type="button" class="pill-toggle" id="toggleSources" aria-pressed="true">Sources</button>
+                <button type="button" class="pill-toggle" id="toggleTiming" aria-pressed="false">Timing</button>
+              </div>
+              <div class="composer-end">
+                <span id="count" class="count" hidden></span>
+                <button type="submit" id="send" class="send" aria-label="Send" disabled>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <div class="modes" role="radiogroup" aria-label="Answer depth">
+            <button type="button" class="mode" role="radio" data-mode="fast" aria-checked="false" title="3 records, no linked records">Fast</button>
+            <button type="button" class="mode" role="radio" data-mode="indepth" aria-checked="true" title="6 records + 1 hop through relationships">In-depth</button>
+            <button type="button" class="mode" role="radio" data-mode="holistic" aria-checked="false" title="10 records + 2 hops through relationships">Holistic</button>
+          </div>
+
+          <!-- <div class="suggest">
+            <button type="button" class="chip">Which projects have been finished?</button>
+            <button type="button" class="chip">Which workspace does Aisha Khan belong to?</button>
+            <button type="button" class="chip">What tasks are assigned to Rohan Mehta?</button>
+          </div>
+        </div> -->
+
+        <button type="button" id="newChat" class="fab" aria-label="New chat" title="New chat">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        </div>
+      </section>
+
+      <!-- ============================= SEARCH ============================= -->
+      <section id="view-search" class="view" aria-label="Search" hidden>
+        <div class="panel">
+          <h2>Semantic search</h2>
+          <p class="lead">See exactly which records match, with their scores and relationships. No LLM involved.</p>
+          <form id="searchForm" class="card search-form" autocomplete="off">
+            <label class="sr-only" for="searchInput">Search query</label>
+            <input id="searchInput" type="text" maxlength="500" placeholder="e.g. completed projects in Acme Corp">
+            <div class="search-opts">
+              <label>Results
+                <select id="searchK"><option>3</option><option selected>5</option><option>10</option><option>20</option></select>
+              </label>
+              <label class="check"><input type="checkbox" id="searchHybrid" checked> Hybrid (keywords)</label>
+              <label class="check"><input type="checkbox" id="searchExpand"> Follow relationships</label>
+              <button type="submit" class="btn" id="searchBtn">Search</button>
+            </div>
+          </form>
+          <div id="searchOut" class="results"></div>
+        </div>
+      </section>
+
+      <!-- ============================== INDEX ============================= -->
+      <section id="view-data" class="view" aria-label="Index" hidden>
+        <div class="panel">
+          <h2>Index &amp; ingestion</h2>
+          <p class="lead">What is indexed, which models are in use, and a button to refresh the data.</p>
+          <div id="stats" class="grid"></div>
+
+          <div class="card ingest">
+            <h3>Update the index</h3>
+            <p class="muted">Reads MongoDB, detects relationships and embeds only new or changed records.</p>
+            <div class="ingest-row">
+              <label class="field">Ingest token
+                <input id="tokenInput" type="password" placeholder="only if INGEST_TOKEN is set" autocomplete="off">
+              </label>
+              <label class="check"><input type="checkbox" id="fullInput"> Re-embed everything</label>
+              <button type="button" class="btn" id="ingestBtn">Start ingestion</button>
+            </div>
+            <div id="jobBox" class="job" hidden>
+              <div class="job-head"><span id="jobState" class="badge">idle</span><span id="jobMeta" class="muted"></span></div>
+              <pre id="jobLog" class="log"></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="{% static 'rag/app.js' %}" defer></script>
+</body>
+</html>
