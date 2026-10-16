@@ -36,7 +36,8 @@ def _list(name, default=""):
 # LLM backend: "openai" (any OpenAI-compatible API: Groq, OpenAI, ...), "gemini" (Google Gemini) or "ollama" (local model).
 # The local profile uses smaller prompts and longer timeouts by default: a 4B model on a laptop is slower and has
 # a smaller effective context than a hosted model.
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").strip().lower()   # openai | ollama | gemini
+_has_gemini = bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini" if _has_gemini else "openai").strip().lower()   # openai | ollama | gemini
 _LOCAL = LLM_PROVIDER == "ollama"
 _GEMINI = LLM_PROVIDER == "gemini"      # Google Gemini through its OpenAI-compatible endpoint
 
