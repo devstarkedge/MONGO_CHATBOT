@@ -161,7 +161,7 @@ STRUCT_TIMEOUT_MS = _int("STRUCT_TIMEOUT_MS", 10000)
 # a question that names one small collection still returns its complete list, but conditions are applied by the LLM.
 STRUCT_PLANNER = os.getenv("STRUCT_PLANNER", "on").strip().lower()
 CATALOG_CHARS = _int("CATALOG_CHARS", 3500 if _LOCAL else 8000)    # size of the catalog shown to the planner
-CATALOG_MAX_AGE_HOURS = _int("CATALOG_MAX_AGE_HOURS", 24)       # saved catalog is refreshed in the background after this
+CATALOG_MAX_AGE_HOURS = _int("CATALOG_MAX_AGE_HOURS", 8760)       # saved catalog is reused (refresh with: ingest)
 
 # --------------------------------------------------------------------- LLM
 # Any OpenAI-compatible API. Defaults: Groq + gpt-oss-20b.
