@@ -58,6 +58,7 @@ INSTALLED_APPS = ["django.contrib.staticfiles", "rag.apps.RagConfig"]
 # No cookies/sessions/auth are used: the JSON API is stateless, so no CSRF middleware is needed.
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.middleware.common.CommonMiddleware",
     "rag.middleware.request_log_middleware",
 ]
@@ -73,6 +74,16 @@ TEMPLATES = [{
 DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}}
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+STATIC_ROOT = BASE_DIR / "staticfiles"
+WHITENOISE_USE_FINDERS = True
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
 USE_TZ = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGGING = {
