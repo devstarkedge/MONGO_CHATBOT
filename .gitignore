@@ -14,6 +14,9 @@ staticfiles/
 # Generated search index (rebuild with: python manage.py build_index)
 vector_store/*
 !vector_store/.gitkeep
+!vector_store/catalog.json
+!vector_store/index_meta.json
+!vector_store/index.faiss
 
 # Editors / OS
 .idea/
