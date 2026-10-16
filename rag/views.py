@@ -82,7 +82,7 @@ def _check_ingest_auth(request):
 
 
 # ------------------------------------------------------------------- views
-@require_GET
+@require_http_methods(["GET", "HEAD"])
 def index(request):
     return render(request, "rag/index.html")
 
@@ -130,7 +130,7 @@ def ingest(request):
         return _error(exc)
 
 
-@require_GET
+@require_http_methods(["GET", "HEAD"])
 def health(request):
     try:
         return JsonResponse(rag_service.health())
