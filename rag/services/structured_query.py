@@ -250,6 +250,11 @@ def catalog_text(catalog: dict, limit: int = None) -> str:
 
     def render(with_values: bool) -> str:
         lines = []
+        aliases = get_aliases()
+        if aliases:
+            distinct_aliases = sorted({f"'{k}' -> '{v}'" for k, v in aliases.items() if k != v and v in catalog})
+            if distinct_aliases:
+                lines.append(f"Domain Aliases: {'; '.join(distinct_aliases)}")
         for name, info in catalog.items():
             parts = []
             for path, meta in info["fields"].items():
@@ -278,12 +283,23 @@ def _to_number(value):
         return None
 
 
+def get_aliases() -> dict:
+    return getattr(settings, "COLLECTION_ALIASES", {})
+
+
 def validate_plan(plan, catalog: dict):
     """Return a clean plan or None. Strict on purpose: reject rather than guess."""
     if not isinstance(plan, dict):
         return None
     collection = plan.get("collection")
-    if not isinstance(collection, str) or collection not in catalog:
+    if not isinstance(collection, str):
+        return None
+    # Resolve aliases (e.g. 'projects' -> 'boards', 'tasks' -> 'cards')
+    aliases = get_aliases()
+    col_lower = collection.strip().lower()
+    if col_lower in aliases and aliases[col_lower] in catalog:
+        collection = aliases[col_lower]
+    elif collection not in catalog:
         return None
     operation = plan.get("operation", "list")
     operation = operation if operation in ("list", "count") else "list"
@@ -368,20 +384,29 @@ def _condition(info: dict, fname: str, op: str, value, notes: list):
 
 
 def match_collection(question: str, names: list):
-    """No-LLM fallback: the one collection whose name appears in the question (singular or plural)."""
+    """No-LLM fallback: the one collection whose name or alias appears in the question (singular or plural)."""
     words = {_singular(w) for w in re.findall(r"[a-z0-9]+", question.lower())}
+    aliases = get_aliases()
+    alias_matches = {aliases[w] for w in words if w in aliases and aliases[w] in names}
+    if len(alias_matches) == 1:
+        return next(iter(alias_matches))
     matches = [n for n in names if _singular(_norm(n)) in words]
     return matches[0] if len(matches) == 1 else None
 
 
 def mentions_collection(question: str) -> bool:
-    """True when the question uses a collection name in its plural form ("departments", "tasks")."""
+    """True when the question uses a collection name or alias (e.g. 'projects', 'boards', 'tasks')."""
     try:
         names = known_collections()
     except ChatbotError:
         return False
     words = set(re.findall(r"[a-z0-9]+", question.lower()))
-    return any(_norm(n) in words and _norm(n).endswith("s") for n in names)
+    singular_words = {_singular(w) for w in words}
+    aliases = get_aliases()
+    if any(w in aliases for w in (words | singular_words)):
+        return True
+    return any(_norm(n) in words or _singular(_norm(n)) in singular_words for n in names)
+
 
 
 # -------------------------------------------------------------- execution

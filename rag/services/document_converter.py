@@ -200,7 +200,8 @@ class _Walker:
 
 
 def _summary(collection, rels) -> str:
-    text = f"This is a record in the '{collection}' collection"
+    domain_type = "project" if collection == "boards" else "task" if collection == "cards" else "record"
+    text = f"This is a {domain_type} in the '{collection}' collection"
     pairs = sorted({(r["ref_collection"], humanize_key(strip_id_suffix(r["field"].split(".")[-1])).lower())
                     for r in rels})
     if pairs:

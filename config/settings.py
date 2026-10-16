@@ -163,6 +163,41 @@ STRUCT_PLANNER = os.getenv("STRUCT_PLANNER", "on").strip().lower()
 CATALOG_CHARS = _int("CATALOG_CHARS", 3500 if _LOCAL else 8000)    # size of the catalog shown to the planner
 CATALOG_MAX_AGE_HOURS = _int("CATALOG_MAX_AGE_HOURS", 8760)       # saved catalog is reused (refresh with: ingest)
 
+# Collection and domain synonyms: maps business terms to underlying MongoDB collections
+DEFAULT_COLLECTION_ALIASES = {
+    "project": "boards",
+    "projects": "boards",
+    "board": "boards",
+    "boards": "boards",
+    "task": "cards",
+    "tasks": "cards",
+    "card": "cards",
+    "cards": "cards",
+    "subtask": "cards",
+    "subtasks": "cards",
+    "employee": "users",
+    "employees": "users",
+    "member": "users",
+    "members": "users",
+    "user": "users",
+    "users": "users",
+    "staff": "users",
+    "person": "users",
+    "people": "users",
+    "department": "departments",
+    "departments": "departments",
+    "workspace": "workspaces",
+    "workspaces": "workspaces",
+}
+COLLECTION_ALIASES = DEFAULT_COLLECTION_ALIASES.copy()
+if os.getenv("COLLECTION_ALIASES"):
+    try:
+        import json as _json
+        COLLECTION_ALIASES.update(_json.loads(os.getenv("COLLECTION_ALIASES")))
+    except Exception:
+        pass
+
+
 # --------------------------------------------------------------------- LLM
 # Any OpenAI-compatible API. Defaults: Groq + gpt-oss-20b.
 # OpenAI: LLM_BASE_URL=https://api.openai.com/v1  LLM_MODEL=gpt-4o-mini

@@ -27,7 +27,8 @@ _answer_cache = cache_service.TTLCache(settings.CACHE_MAX_ENTRIES, settings.CACH
 # Questions that expect SEVERAL answers. They automatically retrieve more records (LIST_TOP_K).
 LIST_PATTERN = re.compile(
     r"\b(?:all|every|each|list|enumerate|how many|show me|give me|what are|who are|"
-    r"which\s+(?!is\b|are\b)\w{3,}s)\b", re.IGNORECASE)
+    r"which\s+(?!is\b|are\b)\w{3,}s?)\b", re.IGNORECASE)
+
 
 
 def is_list_question(question: str) -> bool:
