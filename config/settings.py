@@ -43,7 +43,17 @@ _GEMINI = LLM_PROVIDER == "gemini"      # Google Gemini through its OpenAI-compa
 # ------------------------------------------------------------------ Django
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-insecure-key-change-me")
 DEBUG = _bool("DJANGO_DEBUG", True)
-ALLOWED_HOSTS = _list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+ALLOWED_HOSTS = _list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,.onrender.com")
+_render_host = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+if _render_host and _render_host not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_render_host)
+
+CSRF_TRUSTED_ORIGINS = _list(
+    "DJANGO_CSRF_TRUSTED_ORIGINS",
+    "http://localhost,http://127.0.0.1,https://*.onrender.com",
+)
+if _render_host:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{_render_host}")
 INSTALLED_APPS = ["django.contrib.staticfiles", "rag.apps.RagConfig"]
 # No cookies/sessions/auth are used: the JSON API is stateless, so no CSRF middleware is needed.
 MIDDLEWARE = [
