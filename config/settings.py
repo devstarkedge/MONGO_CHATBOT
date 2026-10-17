@@ -160,7 +160,7 @@ STRUCT_TIMEOUT_MS = _int("STRUCT_TIMEOUT_MS", 10000)
 # "on": the LLM plans list/count questions (filters). "off": no planning call (faster on a slow local model):
 # a question that names one small collection still returns its complete list, but conditions are applied by the LLM.
 STRUCT_PLANNER = os.getenv("STRUCT_PLANNER", "on").strip().lower()
-CATALOG_CHARS = _int("CATALOG_CHARS", 3500 if _LOCAL else 8000)    # size of the catalog shown to the planner
+CATALOG_CHARS = _int("CATALOG_CHARS", 3500 if _LOCAL else 16000)    # size of the catalog shown to the planner
 CATALOG_MAX_AGE_HOURS = _int("CATALOG_MAX_AGE_HOURS", 8760)       # saved catalog is reused (refresh with: ingest)
 
 # Collection and domain synonyms: maps business terms to underlying MongoDB collections
@@ -188,6 +188,15 @@ DEFAULT_COLLECTION_ALIASES = {
     "departments": "departments",
     "workspace": "workspaces",
     "workspaces": "workspaces",
+    "company": "workspaces",
+    "companies": "workspaces",
+    "organization": "workspaces",
+    "organizations": "workspaces",
+    "org": "workspaces",
+    "team": "workspaces",
+    "teams": "workspaces",
+    "membership": "workspacememberships",
+    "memberships": "workspacememberships",
 }
 COLLECTION_ALIASES = DEFAULT_COLLECTION_ALIASES.copy()
 if os.getenv("COLLECTION_ALIASES"):

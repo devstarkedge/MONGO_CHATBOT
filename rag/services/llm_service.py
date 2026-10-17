@@ -187,21 +187,29 @@ Format:
 
 Rules:
 - Use ONLY collections and fields from the catalog. Never invent names.
-- Domain vocabulary and mappings:
+- Domain vocabulary and schema relationships:
+  * "workspace", "company", "organization", or "team" refers to the 'workspaces' collection (e.g. 'Stark Edge Team', 'Stark Edge').
+  * "employee", "staff", "member", or "user" refers to the 'users' collection (which stores user profiles, names, emails, roles).
+  * In 'users', the employee's workspace / company is stored in 'lastActiveWorkspace' (reference to 'workspaces').
+    Example: "employees of Stark Edge" -> {"collection": "users", "operation": "list", "filters": [{"field": "lastActiveWorkspace", "op": "eq", "value": "Stark Edge"}], "show": ["name", "email"]}
+  * In 'users', the employee's department is stored in 'department' (reference to 'departments', e.g. Frontend, Design, Sales, Shopify, SEO).
+    Important: "Stark Edge" is a WORKSPACE/company name, NOT a department!
   * "project" or "projects" refers to the 'boards' collection (where project name, status, and members are stored).
-  * "task", "tasks", or "subtasks" refers to the 'cards' collection (board field references 'boards', assignees/members reference 'users').
-  * "employee", "staff", "member", or "user" refers to the 'users' collection.
-  * Questions like "which project is <person> working on" -> query 'boards' collection with filter {"field": "members", "op": "eq", "value": "<person>"}, show ["name"].
+    In 'boards', the workspace is 'workspaceId', department is 'department', and members reference 'users'.
+  * "task", "tasks", "subtasks", or "activities" (when referring to tasks, work items, or pending work, e.g. 'pending activities', 'assigned activities', 'open tasks') refers to the 'cards' collection.
+    Note: The 'activities' collection is an audit/time-log event stream (type='time_logged', etc.), NOT actionable tasks.
+    In 'cards', board references 'boards', assignees reference 'users' (field 'assignees'), and workspace is 'workspaceId'.
+  * "roles" refers to the 'roles' collection (e.g. Employee, Manager, Admin).
+  * Questions like "tasks assigned to <person>", "pending tasks for <person>", or "<person>'s pending activities" -> query 'cards' collection with filter {"field": "assignees", "op": "eq", "value": "<person>"}, {"field": "status", "op": "ne", "value": "done"}, {"field": "status", "op": "ne", "value": "completed"}, show ["title", "status", "board"].
+  * For 'cards' (tasks/activities), always include "board" in show so the project name is displayed for each card.
 - "list" for questions wanting items (list, show, which, all, what are); "count" for "how many".
 - Add a filter for every condition. Prefer values matching the catalog's sample values.
 - A field described as a reference is filtered by the referenced record's NAME, e.g.
-  "tasks assigned to Rohan Mehta" -> {"field": "assignedTo", "op": "eq", "value": "Rohan Mehta"}.
-  "projects worked on by Vivek Thakur" -> {"collection": "boards", "operation": "list", "filters": [{"field": "members", "op": "eq", "value": "Vivek Thakur"}], "show": ["name"]}.
-- "show" is optional: the few fields needed to answer (e.g. ["name"] for "names of all departments").
+  "tasks assigned to Rohan Mehta" -> {"field": "assignees", "op": "eq", "value": "Rohan Mehta"}.
+  "projects in Stark Edge" -> {"collection": "boards", "operation": "list", "filters": [{"field": "workspaceId", "op": "eq", "value": "Stark Edge"}], "show": ["name"]}.
+- "show" is optional: the few fields needed to answer (e.g. ["name", "email"] for user lists).
   Omit it when whole records are needed.
 - Text comparisons ignore case. "contains" = substring. "in" = list of values.
-- Example (names illustrative): "tasks assigned to Rohan Mehta" ->
-  {"collection": "tasks", "operation": "list", "filters": [{"field": "assignedTo", "op": "eq", "value": "Rohan Mehta"}], "show": ["title"]}
 - If the question needs multiple collections, a calculation, or isn't a list/count of records in one collection,
   reply {"collection": null}."""
 # ----------------------------------------------------------------------------------------------------------

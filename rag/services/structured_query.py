@@ -23,6 +23,7 @@ import logging
 import re
 import threading
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -243,32 +244,73 @@ def build_catalog(force: bool = False, resolver=None) -> dict:
     return catalog
 
 
-def catalog_text(catalog: dict, limit: int = None) -> str:
-    """Compact description of collections and fields for the planner. Sample values are dropped first when
-    the text would exceed `limit` (small local models have small contexts)."""
+CORE_COLLECTIONS = (
+    "workspaces", "users", "workspacememberships", "departments",
+    "boards", "cards", "roles", "activities", "lists", "tasks", "projects"
+)
+
+NOISY_FIELD_PREFIXES = (
+    "pushSubscription", "pushSubscriptions", "settings.notifications",
+    "avatarPublicId", "avatarMetadata", "coverImage.thumbnailUrl",
+    "coverImage.publicId", "icon.publicId", "icon.smallUrl", "icon.mediumUrl", "icon.largeUrl"
+)
+
+
+def _is_noisy_field(path: str) -> bool:
+    return any(path == prefix or path.startswith(prefix + ".") for prefix in NOISY_FIELD_PREFIXES)
+
+
+def catalog_text(catalog: dict, limit: int = None, question: str = "") -> str:
+    """Compact description of collections and fields for the planner. Core collections and
+    question-relevant collections are prioritized so they are never truncated."""
     limit = limit or settings.CATALOG_CHARS
+    q_words = set(re.findall(r"[a-z0-9]+", question.lower())) if question else set()
+    aliases = get_aliases()
+    for w in list(q_words):
+        if w in aliases:
+            q_words.add(aliases[w])
+
+    def sort_key(item):
+        name, info = item
+        if name in CORE_COLLECTIONS:
+            return (0, CORE_COLLECTIONS.index(name))
+        norm_name = _norm(name)
+        if any(w in norm_name or _singular(norm_name) == w for w in q_words):
+            return (1, -info.get("count", 0))
+        if name.startswith("_") or info.get("count", 0) == 0:
+            return (9, 0)
+        return (2, -info.get("count", 0))
+
+    ordered_catalog = OrderedDict(sorted(catalog.items(), key=sort_key))
 
     def render(with_values: bool) -> str:
         lines = []
-        aliases = get_aliases()
         if aliases:
             distinct_aliases = sorted({f"'{k}' -> '{v}'" for k, v in aliases.items() if k != v and v in catalog})
             if distinct_aliases:
                 lines.append(f"Domain Aliases: {'; '.join(distinct_aliases)}")
-        for name, info in catalog.items():
+        for name, info in ordered_catalog.items():
+            if name.startswith("_") and not any(w in name for w in q_words):
+                continue
             parts = []
             for path, meta in info["fields"].items():
+                if _is_noisy_field(path):
+                    continue
                 if meta["ref"]:
                     parts.append(f"{path} (reference to {meta['ref']}; filter it by that record's NAME)")
                 elif meta["values"] and with_values:
                     parts.append(f"{path} [{', '.join(meta['values'])}]")
                 else:
                     parts.append(path)
-            lines.append(f"- {name} ({info['count']} records): " + "; ".join(parts))
+            if parts:
+                lines.append(f"- {name} ({info['count']} records): " + "; ".join(parts))
         return "\n".join(lines)
 
     text = render(True)
-    return (text if len(text) <= limit else render(False))[:limit]
+    if len(text) <= limit:
+        return text
+    text_no_vals = render(False)
+    return text_no_vals[:limit]
 
 
 # ------------------------------------------------------------------ plans
@@ -320,6 +362,8 @@ def validate_plan(plan, catalog: dict):
             return None
         clean.append({"field": fname, "op": op, "value": value})
     show = [f for f in (plan.get("show") or []) if isinstance(f, str) and f in valid][:MAX_SHOW]   # display only
+    if collection == "cards" and show and "board" not in show and "board" in valid:
+        show.append("board")
     return {"collection": collection, "operation": operation, "filters": clean, "show": show}
 
 
@@ -341,6 +385,17 @@ def _ids_by_name(target: str, value: str) -> list:
     ids = []
     for doc in mongo_service.get_db()[target].find(cond, {"_id": 1}).limit(50):
         ids.extend([doc["_id"], str(doc["_id"])])
+    if not ids and len(tokens) == 1 and len(tokens[0]) >= 4:
+        norm_token = _norm(tokens[0])
+        projection = {"_id": 1, **{f: 1 for f in fields}}
+        for doc in mongo_service.get_db()[target].find({}, projection).limit(100):
+            matched = False
+            for f in fields:
+                val = doc.get(f)
+                if isinstance(val, str) and (norm_token in _norm(val) or _norm(val) in norm_token):
+                    ids.extend([doc["_id"], str(doc["_id"])])
+                    matched = True
+                    break
     _name_ids.set(key, ids)
     return ids
 
@@ -355,6 +410,19 @@ def _condition(info: dict, fname: str, op: str, value, notes: list):
         ids = []
         for v in names:
             found = _ids_by_name(target, str(v))
+            if not found:
+                for alt_fname, alt_meta in info["fields"].items():
+                    if alt_fname != fname and alt_meta.get("ref") and alt_meta.get("ref") != target:
+                        alt_target = alt_meta.get("ref")
+                        alt_found = _ids_by_name(alt_target, str(v))
+                        if alt_found:
+                            logger.info("Auto-corrected reference field %s (%s) -> %s (%s) for '%s'",
+                                        fname, target, alt_fname, alt_target, v)
+                            fname = alt_fname
+                            target = alt_target
+                            found = alt_found
+                            notes.append(f"Interpreted '{v}' as {alt_fname} in '{alt_target}' instead of {fname}.")
+                            break
             if not found:
                 notes.append(f"No record in '{target}' matches the name '{v}'.")
             ids.extend(found)
@@ -507,7 +575,7 @@ def try_structured(question: str):
             plan = None                     # no planning call: rely on the no-LLM collection-name fallback below
         else:
             try:
-                plan = validate_plan(llm_service.plan_query(question, catalog_text(catalog)), catalog)
+                plan = validate_plan(llm_service.plan_query(question, catalog_text(catalog, question=question)), catalog)
             except ChatbotError as exc:
                 planner_ok = False
                 logger.warning("Query planner unavailable: %s", exc.message)
