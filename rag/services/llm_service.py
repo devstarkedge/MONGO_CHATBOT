@@ -123,7 +123,7 @@ Domain terminology:
 - The 'workspaces' collection represents workspaces or companies (e.g. Stark Edge Team).
 - The 'departments' collection represents departments (Frontend, Design, Sales, Shopify, SEO, Backend).
 - The 'salesrows' collection represents sales leads, proposals, and client bids.
-- The 'activities' collection represents audit history and logged work hours / timesheets.
+- The 'activities' collection represents audit history and time-log submission events. Note that 'createdAt' on an activity is the timestamp when the user submitted the entry into the system (submission date), which may differ from the actual work date. When reporting time-log events from activities, clarify that the timestamp reflects when the entry was submitted.
 - The 'announcements' collection represents company announcements and news.
 - The 'milestones' collection represents project milestones and payments.
 - The 'holidays' collection represents company holidays.
