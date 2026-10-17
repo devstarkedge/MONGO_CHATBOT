@@ -371,6 +371,10 @@ def validate_plan(plan, catalog: dict):
         for f in ("card", "board", "createdAt"):
             if f in valid and f not in show and len(show) < MAX_SHOW:
                 show.append(f)
+    if collection == "users" and show:
+        for f in ("lastActiveWorkspace", "department", "role"):
+            if f in valid and f not in show and len(show) < MAX_SHOW:
+                show.append(f)
     return {"collection": collection, "operation": operation, "filters": clean, "show": show}
 
 

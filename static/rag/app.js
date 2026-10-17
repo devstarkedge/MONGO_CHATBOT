@@ -331,8 +331,8 @@
         return chip;
     }
 
-    function addBot(parts, isError) {
-        const bubble = h("div", { class: "bubble" }, parts.body);
+    function addBot(parts, isError, isTyping = false) {
+        const bubble = h("div", { class: "bubble" + (isTyping ? " is-typing" : "") }, parts.body);
         if (parts.sources && parts.sources.length) {
             bubble.append(h("div", { class: "sources" }, h("span", { class: "src-label" }, "Sources"), parts.sources.map(sourceChip)));
         }
@@ -346,7 +346,7 @@
             });
             bubble.append(h("div", { class: "actions" }, btn));
         }
-        const msg = h("div", { class: "msg bot" + (isError ? " error" : "") }, staticSvg(MARK, "avatar"), bubble);
+        const msg = h("div", { class: "msg bot" + (isTyping ? " is-typing" : "") + (isError ? " error" : "") }, staticSvg(MARK, "avatar"), bubble);
         inner.append(msg);
         scrollEnd();
         return msg;
@@ -368,7 +368,7 @@
             badge,
             wave
         );
-        const msg = addBot({ body: card });
+        const msg = addBot({ body: card }, false, true);
 
         const stages = [
             "Searching records…",
