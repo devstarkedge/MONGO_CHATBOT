@@ -36,7 +36,7 @@ def is_list_question(question: str) -> bool:
 
 
 GREETING_WORDS = {
-    "hello", "hi", "hey", "hiya", "greetings", "namaste", "hola",
+    "hello", "hlo", "hi", "hey", "hiya", "greetings", "namaste", "hola",
     "good morning", "good afternoon", "good evening", "good day",
     "hey there", "hello there", "hi there"
 }
