@@ -233,13 +233,29 @@ def resolve_contextual_query(question: str, history: list) -> str:
 
     # Extract target person from previous turn
     prev_person = None
-    m_name = re.search(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:'s|\b)", last_q)
-    if m_name and m_name.group(1).lower() not in {"what", "how", "give", "list", "show", "tell", "which", "all", "check", "provide"}:
-        prev_person = m_name.group(1).strip()
+    # 1a. Possessive name in question (e.g. "shubham's project", "vishal sharma's leaves", "vishal's tasks")
+    m_possessive = re.search(r"\b([a-zA-Z]+(?:\s+[a-zA-Z]+)?)(?:'s|’s)\b", last_q, re.IGNORECASE)
+    if m_possessive:
+        words = m_possessive.group(1).split()
+        words = [w for w in words if w.lower() not in {"what", "how", "give", "list", "show", "tell", "which", "all", "check", "today", "yesterday", "can", "you", "me"}]
+        if words:
+            prev_person = " ".join(w.capitalize() for w in words)
+
+    # 1b. Name pattern in question
+    if not prev_person:
+        m_name = re.search(r"\b([A-Za-z][a-z]+(?:\s+[A-Za-z][a-z]+)?)\b", last_q)
+        if m_name and m_name.group(1).lower() not in {"what", "how", "give", "list", "show", "tell", "which", "all", "check", "provide", "can", "you", "details", "me", "project", "projects", "task", "tasks"}:
+            prev_person = m_name.group(1).capitalize()
+
+    # 1c. Name in previous answer (e.g. "Shubham has worked on...", "Here is Vishal Sharma's...")
     if not prev_person and last_a:
-        m_ans = re.search(r"\b([A-Z][a-z]+\s+[A-Z][a-z]+)\b", last_a[:200])
-        if m_ans and m_ans.group(1).lower() not in {"stark edge", "full leave", "halfday leave", "short leave"}:
-            prev_person = m_ans.group(1).strip()
+        m_ans_single = re.search(r"^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b", last_a.strip())
+        if m_ans_single and m_ans_single.group(1).lower() not in {"here", "there", "the", "according", "these", "this", "please", "yes", "stark"}:
+            prev_person = m_ans_single.group(1).strip()
+        if not prev_person:
+            m_ans = re.search(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b", last_a[:200])
+            if m_ans and m_ans.group(1).lower() not in {"stark edge", "full leave", "halfday leave", "short leave", "status", "total", "logged", "hours", "dates"}:
+                prev_person = m_ans.group(1).strip()
 
     # 2. Pronoun resolution
     pronoun_pattern = re.compile(r"\b(his|her|he|she|him)\b", re.IGNORECASE)
@@ -263,7 +279,23 @@ def resolve_contextual_query(question: str, history: list) -> str:
                 return f"give me {candidate_person}'s tasks and projects"
             return f"give details and work for {candidate_person}"
 
-    # 4. Month or timeframe drill-down (e.g. "what about June?", "in June", "for August 2026")
+    # 4. Refinement or entity narrowing follow-up (e.g. "only projects list", "just projects", "only tasks", "only list")
+    refinement_pattern = re.match(
+        r"^(?:only|just|show|give|list)?\s*(?:the\s+)?(projects?|tasks?|leaves?|hours?|timesheets?)\s*(?:list|only|names?)?\??$",
+        cleaned_lower
+    )
+    if prev_person and refinement_pattern:
+        target_entity = refinement_pattern.group(1).lower()
+        if "project" in target_entity:
+            return f"Give only the list of projects for {prev_person}"
+        elif "task" in target_entity:
+            return f"Give only the list of tasks for {prev_person}"
+        elif "leave" in target_entity:
+            return f"Give only the leave records for {prev_person}"
+        elif "hour" in target_entity or "timesheet" in target_entity:
+            return f"Give only the logged hours and timesheet for {prev_person}"
+
+    # 5. Month or timeframe drill-down (e.g. "what about June?", "in June", "for August 2026")
     for m in MONTH_NAMES:
         if m in cleaned_lower:
             tokens = cleaned_lower.split()
