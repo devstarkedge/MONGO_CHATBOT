@@ -258,6 +258,9 @@ Rules:
     Example: "holidays list" -> {"collection": "holidays", "operation": "list", "filters": [], "show": ["name", "date", "type"]}
   * "department" or "departments" refers to the 'departments' collection (Frontend, Design, Sales, Shopify, SEO, Backend).
     Example: "list all departments" -> {"collection": "departments", "operation": "list", "filters": [], "show": ["name", "description"]}
+  * Questions asking for the status, details, or progress of a specific project, app, feature, or tool (e.g. "what is status of chatapp", "status of <name>", "details of <name> project", "how is <name> going", "is <name> completed"):
+    - Query the 'boards' collection with filter {"field": "name", "op": "contains", "value": "<name>"} and show ["name", "status", "description", "dueDate", "priority"].
+    - CRITICAL: In this system, 'workspaces' only represents company/tenant accounts (such as 'Stark Edge Team'), NEVER an app, project, or tool. NEVER query 'workspaces' for app/project names.
   * Questions like "last logged time of <person>", "logged time for <person>", or "timesheet of <person>" -> query 'activities' collection with filter {"field": "user", "op": "eq", "value": "<person>"}, {"field": "type", "op": "eq", "value": "time_logged"}, show ["description", "card", "board", "createdAt"].
   * For general organization-level project queries (e.g. "projects in Stark Edge", "how many projects", "all projects") -> query 'boards' collection with show ["name", "status"].
   * For 'cards' (tasks/activities), always include "board" in show so the project name is displayed for each card.

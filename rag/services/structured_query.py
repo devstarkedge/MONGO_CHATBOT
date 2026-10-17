@@ -607,6 +607,40 @@ def execute(plan: dict, catalog: dict, source: str):
                             notes=notes,
                             timings={"db": round((time.perf_counter() - started) * 1000)}
                         )
+        if total == 0 and name == "boards":
+            # Check if the user was looking for a task/card instead
+            name_filter = next((f for f in plan.get("filters", []) if f.get("field") == "name" and f.get("op") in ("eq", "contains")), None)
+            if name_filter:
+                term = str(name_filter.get("value", "")).strip()
+                terms_to_try = [term]
+                if "app" in term.lower() and " " not in term:
+                    terms_to_try.append(re.sub(r"(?i)app", " app", term).strip())
+                db = mongo_service.get_db()
+                for t in terms_to_try:
+                    c_cursor = db["cards"].find({"title": re.compile(re.escape(t), re.IGNORECASE)}).limit(wanted)
+                    c_docs = list(c_cursor)
+                    if c_docs:
+                        c_records = []
+                        for c in c_docs:
+                            b_doc = db["boards"].find_one({"_id": c.get("board")}) if c.get("board") else None
+                            b_name = b_doc.get("name") if b_doc else "Unknown Project"
+                            c_records.append({
+                                "document_id": str(c["_id"]),
+                                "name": c.get("title") or "Untitled Task",
+                                "text": f"Task: {c.get('title')}; Status: {c.get('status')}; Belongs to Project: {b_name}"
+                            })
+                        notes.append(f"Found matching task in 'cards' for '{term}':")
+                        return ExactResult(
+                            collection="cards",
+                            total=len(c_docs),
+                            records=c_records,
+                            conditions=f"title contains '{term}'",
+                            complete=True,
+                            source=source,
+                            operation="list",
+                            notes=notes,
+                            timings={"db": round((time.perf_counter() - started) * 1000)}
+                        )
         if total == 0:
             return None                       # probably a mis-read question: let similarity search try instead
     cursor = collection.find(flt)
@@ -631,6 +665,24 @@ def execute(plan: dict, catalog: dict, source: str):
             body = _select_lines(body, labels)
         records.append({"document_id": conv.primary_id, "name": conv.display_name,
                         "text": "; ".join(body)[:MAX_RECORD_CHARS]})
+    if name == "boards":
+        name_filter = next((f for f in plan.get("filters", []) if f.get("field") == "name" and f.get("op") in ("eq", "contains")), None)
+        if name_filter:
+            term = str(name_filter.get("value", "")).strip()
+            terms_to_try = [term]
+            if "app" in term.lower() and " " not in term:
+                terms_to_try.append(re.sub(r"(?i)app", " app", term).strip())
+            db = mongo_service.get_db()
+            for t in terms_to_try:
+                c_docs = list(db["cards"].find({"title": re.compile(re.escape(t), re.IGNORECASE)}).limit(5))
+                for c in c_docs:
+                    b_doc = db["boards"].find_one({"_id": c.get("board")}) if c.get("board") else None
+                    b_name = b_doc.get("name") if b_doc else "Unknown Project"
+                    records.append({
+                        "document_id": str(c["_id"]),
+                        "name": f"Task: {c.get('title')}",
+                        "text": f"Also found matching Task: {c.get('title')}; Task Status: {c.get('status')}; Belongs to Project: {b_name}"
+                    })
     return ExactResult(collection=name, total=total, records=records, conditions="; ".join(texts) or "none",
                        complete=total <= len(records), source=source, operation=plan["operation"], notes=notes,
                        timings={"db": round((time.perf_counter() - started) * 1000)})
