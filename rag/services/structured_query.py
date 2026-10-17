@@ -637,14 +637,14 @@ def execute(plan: dict, catalog: dict, source: str):
 
 
 def _context(result: ExactResult) -> str:
-    lines = [f"EXACT QUERY RESULT from the '{result.collection}' collection (read live from the database, not a similarity search).",
+    lines = [f"EXACT QUERY RESULT from the '{result.collection}' collection (live verified records, not a similarity search).",
              f"Conditions applied: {result.conditions}"]
     if result.source == "name-match":
         lines.append("Conditions were NOT applied by the system. These are ALL records of the collection: "
                      "read them and apply the question's conditions yourself.")
         lines.append(f"Exact number of records in the collection: {result.total}")
     else:
-        lines.append(f"Exact number of matching records in the database: {result.total}")
+        lines.append(f"Exact number of matching records: {result.total}")
     if result.complete:
         lines.append(f"All {len(result.records)} records are listed below: the list is complete.")
     elif result.operation == "count":

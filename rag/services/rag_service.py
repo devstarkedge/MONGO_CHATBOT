@@ -68,15 +68,15 @@ def check_conversational(question: str) -> str | None:
     if not cleaned:
         return None
     if cleaned in GREETING_WORDS:
-        return "Hello! How can I help you today? You can ask me about employees, workspaces, projects, tasks, departments, or other data in the database."
+        return "Hello! How can I help you today? You can ask me about employees, workspaces, projects, tasks, departments, or other company records."
     if cleaned in HOW_ARE_YOU_WORDS:
-        return "I'm doing well, thank you! How can I assist you with your projects, employees, or database records today?"
+        return "I'm doing well, thank you! How can I assist you with your projects, employees, or tasks today?"
     if cleaned in THANKS_WORDS:
-        return "You're welcome! Let me know if you need any other information from the database."
+        return "You're welcome! Let me know if you need any other information."
     if cleaned in GOODBYE_WORDS:
-        return "Goodbye! Have a great day ahead. Feel free to come back whenever you need database insights."
+        return "Goodbye! Have a great day ahead. Feel free to come back whenever you need assistance."
     if cleaned in CAPABILITIES_WORDS:
-        return ("I am your MongoDB database assistant. You can ask me to list employees, "
+        return ("I am your workplace assistant. You can ask me to list employees, "
                 "check assigned tasks, view departments, inspect projects, or count records.")
     return None
 
@@ -153,8 +153,8 @@ SOURCE_CAP = 25
 
 def _plain_answer(exact) -> str:
     """The exact result without the LLM, used when the language model is unavailable."""
-    head = (f"The language model is unavailable right now, so this is the plain result read directly from the "
-            f"database: {exact.total} matching record(s) in '{exact.collection}' (conditions: {exact.conditions}).")
+    head = (f"The language model is unavailable right now, so here is the plain result: "
+            f"{exact.total} matching record(s) in '{exact.collection}' (conditions: {exact.conditions}).")
     if exact.operation == "count":
         return head
     items = "\n".join(f"- {r['name'] or r['text'][:160]}" for r in exact.records)

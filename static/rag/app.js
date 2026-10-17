@@ -353,7 +353,7 @@
     }
 
     function addTyping() {
-        const textSpan = h("span", { class: "thinking-label" }, "Searching database…");
+        const textSpan = h("span", { class: "thinking-label" }, "Searching records…");
         const iconSpan = staticSvg(SPARKLE_SEARCH, "thinking-icon");
         const pulseRing = h("span", { class: "thinking-ring" });
         const iconWrap = h("span", { class: "thinking-icon-wrap" }, iconSpan, pulseRing);
@@ -371,10 +371,10 @@
         const msg = addBot({ body: card });
 
         const stages = [
-            "Searching database…",
-            "Analyzing collections & schema…",
-            "Connecting records & details…",
-            "Synthesizing response…"
+            "Searching records…",
+            "Analyzing details…",
+            "Connecting records…",
+            "Preparing response…"
         ];
         let stageIdx = 0;
         const timer = setInterval(() => {
