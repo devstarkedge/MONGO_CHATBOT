@@ -542,6 +542,7 @@ def execute(plan: dict, catalog: dict, source: str):
         texts.append(text)
     flt = {"$and": conds} if conds else {}
     collection = mongo_service.get_db()[name]
+    wanted = 10 if plan["operation"] == "count" else settings.STRUCT_MAX_RECORDS
     total = _count(collection, flt)
     if total == 0 and conds:
         # If querying 'boards' by 'members', fall back to finding boards via assigned 'cards'
@@ -554,11 +555,14 @@ def execute(plan: dict, catalog: dict, source: str):
             if user_ids:
                 card_filter = {"assignees": {"$in": user_ids}}
                 status_f = next((f for f in plan.get("filters", []) if f.get("field") == "status"), None)
+                is_completion_query = False
                 if status_f:
-                    val = str(status_f.get("value", "")).lower()
-                    if val in ("completed", "done"):
+                    raw_val = status_f.get("value")
+                    vals = [str(v).lower() for v in raw_val] if isinstance(raw_val, (list, tuple)) else [str(raw_val).lower()]
+                    if any(v in ("completed", "done", "finished", "closed") for v in vals):
+                        is_completion_query = True
                         card_filter["status"] = {"$in": ["done", "completed"]}
-                    elif val in ("pending", "in-progress", "open"):
+                    elif any(v in ("pending", "in-progress", "open", "active") for v in vals):
                         card_filter["status"] = {"$nin": ["done", "completed"]}
                 cards = list(mongo_service.get_db()["cards"].find(card_filter, {"board": 1}))
                 board_ids = list({c["board"] for c in cards if c.get("board")})
@@ -568,9 +572,43 @@ def execute(plan: dict, catalog: dict, source: str):
                     flt = {"$and": new_conds} if len(new_conds) > 1 else new_conds[0]
                     total = _count(collection, flt)
                     notes.append("Resolved projects via tasks assigned to team members in 'cards'.")
+
+                # If no full projects are marked completed, but the user asked for completed work,
+                # return the exact completed tasks with their parent project names.
+                if total == 0 and is_completion_query:
+                    completed_cards = list(mongo_service.get_db()["cards"].find(card_filter).sort("updatedAt", -1).limit(wanted))
+                    if completed_cards:
+                        db = mongo_service.get_db()
+                        records = []
+                        for c in completed_cards:
+                            board_doc = db["boards"].find_one({"_id": c.get("board")}) if c.get("board") else None
+                            b_name = board_doc.get("name") if board_doc else "Unknown Project"
+                            b_status = board_doc.get("status") if board_doc else "unknown"
+                            title = c.get("title") or "Untitled Task"
+                            c_status = c.get("status") or "done"
+                            txt = f"Completed Task: {title}; Task Status: {c_status}; Belongs to Project: {b_name} (Project Status: {b_status})"
+                            records.append({
+                                "document_id": str(c["_id"]),
+                                "name": title,
+                                "text": txt
+                            })
+                        notes.append(
+                            "No overall projects in 'boards' are marked as completed for this member (associated projects are currently in planning or in-progress). "
+                            "However, the member has completed individual tasks ('cards') across projects listed below:"
+                        )
+                        return ExactResult(
+                            collection="cards",
+                            total=len(completed_cards),
+                            records=records,
+                            conditions="; ".join(texts) or "none",
+                            complete=True,
+                            source=source,
+                            operation="list",
+                            notes=notes,
+                            timings={"db": round((time.perf_counter() - started) * 1000)}
+                        )
         if total == 0:
             return None                       # probably a mis-read question: let similarity search try instead
-    wanted = 10 if plan["operation"] == "count" else settings.STRUCT_MAX_RECORDS
     cursor = collection.find(flt)
     if "createdAt" in info.get("fields", {}):
         cursor = cursor.sort("createdAt", -1)
