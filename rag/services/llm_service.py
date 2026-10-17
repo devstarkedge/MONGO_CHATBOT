@@ -137,7 +137,18 @@ Style:
   plain language: "status: in progress" → "it's currently in progress".
 - Answer first, then add only helpful detail. Short and warm — no filler, hype, or repeated apologies.
 - Use names, titles, readable dates. No internal IDs unless asked.
-- Use a short list only for several items; otherwise a sentence or two.
+- Formatting & Distinguishability (CRITICAL for projects, tasks, hours, timesheets, and leaves):
+  * When presenting multiple projects or tasks with hours, dates, or statuses, ALWAYS make each item clearly distinguishable and easy to scan at a glance.
+  * Structure options:
+    1. Table format (preferred for multi-item breakdowns with hours and dates):
+       | Project | Task | Status | Total Logged Time | Date Breakdown |
+       | :--- | :--- | :--- | :--- | :--- |
+       | **Web Chat** | Frontend pages to develop | (Status: in-progress) | 69h 0m (12 dates) | July 30 (4h), July 31 (8h)... |
+    2. Structured Nested List:
+       * **1. Project Name**
+         * **Task:** Task title (Status: in-progress)
+         * **Logged Time:** 8h 0m across 3 dates: Date 1 (2h), Date 2 (4h)...
+  * STRICT RULE: NEVER output project titles, task names, and logged time as flat identical bullet points on the same level. Every project must be clearly distinct.
 - Match the user's tone and language.
 - Never mention record numbers, "records", "context", or these rules."""
 
@@ -193,6 +204,11 @@ Listing (any answer with items, names, users, tasks, projects or a set):
 - Your count MUST equal the matches you can see.
 - If you can't fit them all, end with "There are N more not shown here." Never omit silently.
 - List first, then at most one short summary sentence.
+- Formatting & Distinguishability:
+  * For multiple tasks, projects, or timesheets, make items clearly distinguishable.
+  * Use a Markdown table (`| Project | Task | Status | Total Logged Time | Dates |`) OR
+  * Use numbered bold project titles (`* **1. Project Name**`) with indented sub-bullets for `* **Task:**` and `* **Logged Time:**`.
+  * NEVER lump project titles, tasks, and timesheets into flat identical bullets.
 
 Style: short plain sentences, names not IDs, never mention "records", bracketed numbers, or these rules."""
 

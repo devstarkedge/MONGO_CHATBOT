@@ -57,11 +57,44 @@
     // ---------------------------------------------- tiny, safe markdown renderer
     function inline(text) {
         const frag = document.createDocumentFragment();
-        for (const part of text.split(/(\*\*[^*\n]+\*\*|`[^`\n]+`)/g)) {
+        const trimmed = String(text || "").trim();
+        const standaloneStatus = trimmed.match(/^(?:[([]?(?:Status:\s*)?)?(done|completed|finished|in-progress|in progress|in-development|to-do|todo|planning|backlog|review)[)\]]?$/i);
+        if (standaloneStatus) {
+            const rawStatus = standaloneStatus[1].trim();
+            const sLower = rawStatus.toLowerCase().replace(/\s+/g, "-");
+            let badgeCls = "status-todo";
+            if (["done", "completed", "finished"].includes(sLower)) badgeCls = "status-done";
+            else if (["in-progress", "in-development", "active", "review"].includes(sLower)) badgeCls = "status-progress";
+            frag.append(h("span", { class: `status-chip ${badgeCls}` }, rawStatus));
+            return frag;
+        }
+
+        // Match bold (**...**), inline code (`...`), italic (*...*), <br>, and status tags like (Status: done)
+        const tokenRegex = /(\*\*[^*\n]+\*\*|`[^`\n]+`|\*[^*\n]+\*|<br\s*\/?>|\((?:Status:\s*)?[a-zA-Z\-_ ]+\)|\[(?:Status:\s*)?[a-zA-Z\-_ ]+\])/gi;
+        const parts = String(text || "").split(tokenRegex);
+        for (const part of parts) {
             if (!part) continue;
-            if (part.length > 4 && part.startsWith("**") && part.endsWith("**")) frag.append(h("strong", {}, part.slice(2, -2)));
-            else if (part.length > 2 && part.startsWith("`") && part.endsWith("`")) frag.append(h("code", {}, part.slice(1, -1)));
-            else frag.append(part);
+            if (/^<br\s*\/?>$/i.test(part)) {
+                frag.append(h("br"));
+            } else if (part.length > 4 && part.startsWith("**") && part.endsWith("**")) {
+                frag.append(h("strong", {}, part.slice(2, -2)));
+            } else if (part.length > 2 && part.startsWith("`") && part.endsWith("`")) {
+                frag.append(h("code", {}, part.slice(1, -1)));
+            } else if (part.length > 2 && part.startsWith("*") && part.endsWith("*") && !part.startsWith("**")) {
+                frag.append(h("em", {}, part.slice(1, -1)));
+            } else {
+                const statusMatch = part.match(/^[(\[](?:Status:\s*)?(done|completed|finished|in-progress|in progress|in-development|to-do|todo|planning|backlog|review)[)\]]$/i);
+                if (statusMatch) {
+                    const rawStatus = statusMatch[1].trim();
+                    const sLower = rawStatus.toLowerCase().replace(/\s+/g, "-");
+                    let badgeCls = "status-todo";
+                    if (["done", "completed", "finished"].includes(sLower)) badgeCls = "status-done";
+                    else if (["in-progress", "in-development", "active", "review"].includes(sLower)) badgeCls = "status-progress";
+                    frag.append(h("span", { class: `status-chip ${badgeCls}` }, rawStatus));
+                } else {
+                    frag.append(part);
+                }
+            }
         }
         return frag;
     }
@@ -70,8 +103,15 @@
     const isNumber = (l) => /^\s*\d+[.)]\s+/.test(l);
     const isTableSep = (l) => /^\s*\|?(\s*:?-{2,}:?\s*\|?)+\s*$/.test(l || "");
     const splitRow = (l) => l.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
-    const startsBlock = (l, next) => /^```/.test(l.trim()) || isBullet(l) || isNumber(l) || /^#{1,6}\s+/.test(l)
-        || (/^\s*\|/.test(l) && isTableSep(next));
+    const isHorizontalRule = (l) => /^\s*([*\-_])\s*(\1\s*){2,}\s*$/.test(l);
+    const isHeading = (l) => /^#{1,6}\s+/.test(l);
+    const startsBlock = (l, next) => /^```/.test(l.trim()) || isBullet(l) || isNumber(l) || isHeading(l)
+        || isHorizontalRule(l) || (/^\s*\|/.test(l) && isTableSep(next));
+    const getIndent = (l) => {
+        const m = l.match(/^(\s*)/);
+        return m ? m[1].replace(/\t/g, "    ").length : 0;
+    };
+    const DETAIL_PREFIX = /^\s*[-*•]\s+(?:Task|Logged Time|Status|Dates?|Hours?|Time|Subtask|Description):\s*/i;
 
     function renderMarkdown(source) {
         const root = h("div", { class: "md" });
@@ -97,18 +137,76 @@
                     h("tbody", {}, body.map((r) => h("tr", {}, r.map((c) => h("td", {}, inline(c)))))))));
                 continue;
             }
-            if (isBullet(line) || isNumber(line)) {
-                const ordered = isNumber(line);
-                const items = [];
-                for (; i < lines.length && (ordered ? isNumber(lines[i]) : isBullet(lines[i])); i++) {
-                    items.push(h("li", {}, inline(lines[i].replace(ordered ? /^\s*\d+[.)]\s+/ : /^\s*[-*•]\s+/, ""))));
-                }
-                root.append(h(ordered ? "ol" : "ul", {}, items));
+            if (isHorizontalRule(line)) {
+                root.append(h("hr", { class: "md-hr" }));
+                i++;
                 continue;
             }
-            if (/^#{1,6}\s+/.test(line)) {
-                root.append(h("p", {}, h("strong", {}, inline(line.replace(/^#{1,6}\s+/, "")))));
+            if (isHeading(line)) {
+                const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+                const level = Math.min(6, headingMatch[1].length);
+                const tag = level <= 2 ? "h3" : (level === 3 ? "h4" : "h5");
+                root.append(h(tag, { class: `md-heading md-h${level}` }, inline(headingMatch[2])));
                 i++;
+                continue;
+            }
+            if (isBullet(line) || isNumber(line)) {
+                const ordered = isNumber(line);
+                const rootList = h(ordered ? "ol" : "ul", { class: "md-list" });
+                const baseIndent = getIndent(line);
+                // Stack items: { el, indent, lastLi, lastLiIsDetail }
+                const stack = [{ el: rootList, indent: baseIndent, lastLi: null, lastLiIsDetail: false }];
+
+                while (i < lines.length) {
+                    const curLine = lines[i];
+                    if (!curLine.trim()) {
+                        // Check if list continues after a blank line
+                        let nextIdx = -1;
+                        for (let j = i + 1; j < lines.length; j++) {
+                            if (lines[j].trim()) { nextIdx = j; break; }
+                        }
+                        if (nextIdx !== -1 && (isBullet(lines[nextIdx]) || isNumber(lines[nextIdx]))) {
+                            i++;
+                            continue;
+                        }
+                        break;
+                    }
+                    if (!isBullet(curLine) && !isNumber(curLine)) break;
+
+                    const curIndent = getIndent(curLine);
+                    const curOrdered = isNumber(curLine);
+                    const rawContent = curLine.replace(curOrdered ? /^\s*\d+[.)]\s+/ : /^\s*[-*•]\s+/, "");
+                    const isCurDetail = DETAIL_PREFIX.test(curLine);
+                    const li = h("li", {}, inline(rawContent));
+
+                    // Check if curLine should be nested:
+                    // 1) Explicit indentation (curIndent > top.indent)
+                    // 2) Or it's a detail bullet (Task:, Logged Time:, etc.) following a non-detail parent
+                    const top = stack[stack.length - 1];
+                    const shouldNest = (curIndent > top.indent && top.lastLi) ||
+                                       (isCurDetail && top.lastLi && !top.lastLiIsDetail && stack.length === 1);
+
+                    if (shouldNest) {
+                        let subList = top.lastLi.querySelector(":scope > .md-sublist");
+                        if (!subList) {
+                            subList = h(curOrdered ? "ol" : "ul", { class: "md-sublist" });
+                            top.lastLi.append(subList);
+                        }
+                        subList.append(li);
+                        stack.push({ el: subList, indent: curIndent, lastLi: li, lastLiIsDetail: isCurDetail });
+                    } else {
+                        // Pop stack if returning to outer level
+                        while (stack.length > 1 && (curIndent < stack[stack.length - 1].indent || (!isCurDetail && stack[stack.length - 1].lastLiIsDetail))) {
+                            stack.pop();
+                        }
+                        const curr = stack[stack.length - 1];
+                        curr.el.append(li);
+                        curr.lastLi = li;
+                        curr.lastLiIsDetail = isCurDetail;
+                    }
+                    i++;
+                }
+                root.append(rootList);
                 continue;
             }
             const para = [];
