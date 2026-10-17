@@ -29,7 +29,7 @@ LIST_PATTERN = re.compile(
     r"\b(?:all|every|each|list|enumerate|how many|show me|give me|give|tell me|what are|who are|"
     r"can you|last|latest|recent|when did|status of|what was|what is|which\s+(?!is\b|are\b)\w{3,}s?|"
     r"what did|what has|what have|what does|completed|complete|done|finished|total|"
-    r"progress|performance|working|overview|assigned)\b", re.IGNORECASE)
+    r"progress|performance|working|overview|assigned|department wise|group|grouped|grouping|sort|sorted|filter|breakdown)\b", re.IGNORECASE)
 
 
 
@@ -221,8 +221,8 @@ def ask(question, top_k=None, collections=None, hops=None, session_id=None) -> d
     list_mode = bool(settings.LIST_TOP_K) and is_list_question(query_text)
     if list_mode:
         top_k = max(top_k, settings.LIST_TOP_K)     # never fewer than the user's mode, more for list questions
-    if settings.STRUCTURED_QUERIES and not collections and (list_mode or structured_query.mentions_collection(query_text)):
-        exact = structured_query.try_structured(query_text)    # exact totals straight from MongoDB
+    if settings.STRUCTURED_QUERIES and not collections and (list_mode or structured_query.mentions_collection(query_text) or bool(history)):
+        exact = structured_query.try_structured(query_text, history=history)    # exact totals straight from MongoDB
         if exact is not None:
             result = _exact_answer(question, exact, history)
             _remember(session_id, question, result)

@@ -658,7 +658,7 @@ def _context(result: ExactResult) -> str:
     return "\n".join(lines)
 
 
-def try_structured(question: str):
+def try_structured(question: str, history: list = None):
     """-> ExactResult, or None when similarity search should handle the question."""
     if not settings.STRUCTURED_QUERIES:
         return None
@@ -667,7 +667,10 @@ def try_structured(question: str):
         catalog = build_catalog()
         if not catalog:
             return None
-        key = " ".join(question.lower().split())
+        hist_context = ""
+        if history:
+            hist_context = " ".join(t.get("question", "") for t in history[-2:])
+        key = " ".join((hist_context + " " + question if hist_context else question).lower().split())
         cached = _plans.get(key)
         plan, source, planner_ok = None, "planner", True
         if cached is not None:
@@ -676,14 +679,16 @@ def try_structured(question: str):
             plan = None                     # no planning call: rely on the no-LLM collection-name fallback below
         else:
             try:
-                plan = validate_plan(llm_service.plan_query(question, catalog_text(catalog, question=question)), catalog)
+                cat_q = (question + " " + hist_context).strip() if hist_context else question
+                raw_plan = llm_service.plan_query(question, catalog_text(catalog, question=cat_q), history=history)
+                plan = validate_plan(raw_plan, catalog)
             except ChatbotError as exc:
                 planner_ok = False
                 logger.warning("Query planner unavailable: %s", exc.message)
             if planner_ok:
                 _plans.set(key, {"plan": plan})
         plan_ms = round((time.perf_counter() - began) * 1000)
-        if plan is None:
+        if plan is None and not history:
             name = match_collection(question, list(catalog))
             if name and catalog[name]["count"] <= settings.STRUCT_SCAN_MAX:
                 plan, source = {"collection": name, "operation": "list", "filters": [], "show": []}, "name-match"
