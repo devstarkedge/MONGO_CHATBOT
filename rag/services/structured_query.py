@@ -671,12 +671,39 @@ def execute(plan: dict, catalog: dict, source: str):
     resolver = _exec_resolver(catalog)
     resolver.prefetch(name, docs, infer=False)      # names only: targets are already known
     labels = _labels_for(plan.get("show") or [])
+    target_uid, target_user_name = None, None
+    if name == "cards":
+        u_f = next((f for f in plan.get("filters", []) if f.get("field") in ("assignees", "user") and f.get("op") in ("eq", "contains")), None)
+        if u_f:
+            target_user_name = str(u_f.get("value", "")).strip()
+            db_tmp = mongo_service.get_db()
+            u_doc = db_tmp["users"].find_one({"name": re.compile(f"^{re.escape(target_user_name)}$", re.IGNORECASE)})
+            if not u_doc:
+                u_doc = db_tmp["users"].find_one({"name": re.compile(re.escape(target_user_name), re.IGNORECASE)})
+            if u_doc:
+                target_uid = u_doc["_id"]
+                target_user_name = u_doc.get("name", target_user_name)
     records = []
     for doc in docs:
         conv = document_converter.convert_document(name, doc, resolver)
         body = conv.lines[2:] if len(conv.lines) > 2 else conv.lines       # drop "Document ID" + summary lines
         if labels:
             body = _select_lines(body, labels)
+        if name == "cards" and target_uid and doc.get("loggedTime"):
+            u_lts = [lt for lt in doc.get("loggedTime", []) if lt.get("user") == target_uid]
+            tot_mins = sum((lt.get("hours") or 0) * 60 + (lt.get("minutes") or 0) for lt in u_lts)
+            dates = []
+            for lt in u_lts:
+                d = lt.get("date")
+                if d and hasattr(d, "strftime"):
+                    dates.append(f"{d.strftime('%B %d, %Y')} ({lt.get('hours', 0)}h {lt.get('minutes', 0)}m)")
+            if dates:
+                dates_str = f" across {len(u_lts)} dates: {'; '.join(dates)}"
+                user_lt_line = f"Logged Time for {target_user_name}: {tot_mins//60}h {tot_mins%60}m{dates_str}"
+            else:
+                user_lt_line = f"Logged Time for {target_user_name}: 0h 0m (no logged entries)"
+            filtered_body = [l for l in body if not l.startswith("Logged Time by ") and not l.startswith("Total Logged Time:")]
+            body = [user_lt_line] + filtered_body
         records.append({"document_id": conv.primary_id, "name": conv.display_name,
                         "text": "; ".join(body)[:MAX_RECORD_CHARS]})
     if name == "boards":

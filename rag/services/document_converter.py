@@ -228,9 +228,23 @@ def convert_document(collection: str, doc: dict, resolver=None) -> Converted:
             u_name = None
             if resolver and u_id:
                 u_name = resolver.lookup("cards", "loggedTime.user", u_id)
+            if isinstance(u_name, (tuple, list)):
+                u_name = u_name[1] if len(u_name) > 1 and u_name[1] else u_name[0]
             if not u_name:
                 u_name = "User"
-            summary_lines.append(f"Logged Time by {u_name}: {m//60}h {m%60}m")
+            user_dates = []
+            for lt in lt_entries:
+                if isinstance(lt, dict) and str(lt.get("user", "")) == u_id:
+                    d = lt.get("date")
+                    if d and hasattr(d, "strftime"):
+                        user_dates.append(f"{d.strftime('%B %d, %Y')} ({lt.get('hours', 0)}h {lt.get('minutes', 0)}m)")
+            if user_dates and len(user_dates) <= 12:
+                dates_str = f" [Dates: {'; '.join(user_dates)}]"
+            elif user_dates:
+                dates_str = f" [{len(user_dates)} dates recorded: {'; '.join(user_dates[:10])}...]"
+            else:
+                dates_str = ""
+            summary_lines.append(f"Logged Time by {u_name}: {m//60}h {m%60}m{dates_str}")
         lines = summary_lines + lines
     if lines:  # only add the framing lines when there is real content
         lines = [f"Document ID: {primary}", _summary(collection, walker.rels)] + lines

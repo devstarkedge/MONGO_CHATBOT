@@ -259,6 +259,13 @@ Rules:
     Example: "holidays list" -> {"collection": "holidays", "operation": "list", "filters": [], "show": ["name", "date", "type"]}
   * "department" or "departments" refers to the 'departments' collection (Frontend, Design, Sales, Shopify, SEO, Backend).
     Example: "list all departments" -> {"collection": "departments", "operation": "list", "filters": [], "show": ["name", "description"]}
+  * "leave", "leaves", "time off", or "vacation" (e.g. "<person>'s leave", "leave history of <person>", "leaves of <person>", "how many leaves"):
+    - In this system, employee leaves are tracked in the 'cards' collection under the project board 'Leave' (where task titles are 'Full Leave', 'Short Leave', 'Halfday Leave', and each leave date and hours are in 'loggedTime').
+    - Query the 'cards' collection with filters:
+      {"field": "board", "op": "eq", "value": "Leave"},
+      {"field": "assignees", "op": "eq", "value": "<person>"}
+      and show ["title", "status", "board", "loggedTime"].
+    - (If asking generally for all leave cards across the team without a specific person: filter {"field": "board", "op": "eq", "value": "Leave"}).
   * Questions asking for the status, details, or progress of a specific project, app, feature, or tool (e.g. "what is status of chatapp", "status of <name>", "details of <name> project", "how is <name> going", "is <name> completed"):
     - Query the 'boards' collection with filter {"field": "name", "op": "contains", "value": "<name>"} and show ["name", "status", "description", "dueDate", "priority"].
     - CRITICAL: In this system, 'workspaces' only represents company/tenant accounts (such as 'Stark Edge Team'), NEVER an app, project, or tool. NEVER query 'workspaces' for app/project names.

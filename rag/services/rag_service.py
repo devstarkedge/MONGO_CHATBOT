@@ -198,6 +198,12 @@ def _exact_answer(question: str, exact, history=None) -> dict:
     return result
 
 
+AFFIRMATIVE_WORDS = {
+    "yes", "yeah", "yep", "sure", "ok", "okay", "please", "yes please",
+    "go ahead", "do that", "yes do that", "tell me", "show me", "check", "check it"
+}
+
+
 def ask(question, top_k=None, collections=None, hops=None, session_id=None) -> dict:
     question = validate_question(question)
     if session_id is not None and (not isinstance(session_id, str) or not re.fullmatch(r"[A-Fa-f0-9-]{1,64}", session_id)):
@@ -217,6 +223,12 @@ def ask(question, top_k=None, collections=None, hops=None, session_id=None) -> d
 
     history = chat_memory.get(session_id) if session_id else []
     query_text = strip_greeting(question)
+    cleaned_lower = query_text.lower().strip().rstrip(".!?")
+    if cleaned_lower in AFFIRMATIVE_WORDS and history:
+        last_turn = history[-1]
+        last_q = last_turn.get("question", "")
+        query_text = f"Provide the specific dates, breakdown, and full details for: {last_q}"
+        question = query_text
     top_k = top_k or settings.TOP_K
     list_mode = bool(settings.LIST_TOP_K) and is_list_question(query_text)
     if list_mode:
