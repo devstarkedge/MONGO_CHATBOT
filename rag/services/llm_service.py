@@ -194,14 +194,20 @@ Rules:
     Example: "employees of Stark Edge" -> {"collection": "users", "operation": "list", "filters": [{"field": "lastActiveWorkspace", "op": "eq", "value": "Stark Edge"}], "show": ["name", "email"]}
   * In 'users', the employee's department is stored in 'department' (reference to 'departments', e.g. Frontend, Design, Sales, Shopify, SEO).
     Important: "Stark Edge" is a WORKSPACE/company name, NOT a department!
-  * "project" or "projects" refers to the 'boards' collection (where project name, status, and members are stored).
-    In 'boards', the workspace is 'workspaceId', department is 'department', and members reference 'users'.
+  * "project" or "projects" refers to the 'boards' collection (where project name, status, and workspace are stored).
+    In 'boards', the workspace is 'workspaceId', and department is 'department'.
+    CRITICAL: In this system, developers and employees are NOT stored in 'boards.members'; they are assigned to tasks in 'cards' (field 'assignees') and linked to the project via 'cards.board'.
   * "task", "tasks", "subtasks", or "activities" (when referring to tasks, work items, or pending work, e.g. 'pending activities', 'assigned activities', 'open tasks') refers to the 'cards' collection.
     Note: The 'activities' collection is an audit/time-log event stream (type='time_logged', etc.), NOT actionable tasks.
     In 'cards', board references 'boards', assignees reference 'users' (field 'assignees'), and workspace is 'workspaceId'.
   * "roles" refers to the 'roles' collection (e.g. Employee, Manager, Admin).
-  * Questions like "tasks assigned to <person>", "pending tasks for <person>", or "<person>'s pending activities" -> query 'cards' collection with filter {"field": "assignees", "op": "eq", "value": "<person>"}, {"field": "status", "op": "ne", "value": "done"}, {"field": "status", "op": "ne", "value": "completed"}, show ["title", "status", "board"].
+  * Questions about a specific person's work, tasks, or projects (e.g. "<person>'s pending activities", "tasks assigned to <person>", "<person>'s completed projects", "<person>'s projects", "projects worked on by <person>"):
+    -> Query 'cards' collection with filter {"field": "assignees", "op": "eq", "value": "<person>"}.
+       - For pending tasks/activities: add filters {"field": "status", "op": "ne", "value": "done"}, {"field": "status", "op": "ne", "value": "completed"}.
+       - For completed projects/tasks: add filter {"field": "status", "op": "in", "value": ["done", "completed"]}.
+       - Always include ["title", "status", "board"] in show so the project name (board) is displayed for each card.
   * Questions like "last logged time of <person>", "logged time for <person>", or "timesheet of <person>" -> query 'activities' collection with filter {"field": "user", "op": "eq", "value": "<person>"}, {"field": "type", "op": "eq", "value": "time_logged"}, show ["description", "card", "board", "createdAt"].
+  * For general organization-level project queries (e.g. "projects in Stark Edge", "how many projects", "all projects") -> query 'boards' collection with show ["name", "status"].
   * For 'cards' (tasks/activities), always include "board" in show so the project name is displayed for each card.
   * For 'activities', always include ["description", "card", "board", "createdAt"] in show so the task, project, and time are displayed.
 - "list" for questions wanting items (list, show, which, all, what are); "count" for "how many".

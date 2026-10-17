@@ -515,7 +515,32 @@ def execute(plan: dict, catalog: dict, source: str):
     collection = mongo_service.get_db()[name]
     total = _count(collection, flt)
     if total == 0 and conds:
-        return None                       # probably a mis-read question: let similarity search try instead
+        # If querying 'boards' by 'members', fall back to finding boards via assigned 'cards'
+        if name == "boards" and any(f.get("field") == "members" for f in plan.get("filters", [])):
+            member_conds = [c for c in conds if "members" in c]
+            user_ids = []
+            for mc in member_conds:
+                if "$in" in mc.get("members", {}):
+                    user_ids.extend(mc["members"]["$in"])
+            if user_ids:
+                card_filter = {"assignees": {"$in": user_ids}}
+                status_f = next((f for f in plan.get("filters", []) if f.get("field") == "status"), None)
+                if status_f:
+                    val = str(status_f.get("value", "")).lower()
+                    if val in ("completed", "done"):
+                        card_filter["status"] = {"$in": ["done", "completed"]}
+                    elif val in ("pending", "in-progress", "open"):
+                        card_filter["status"] = {"$nin": ["done", "completed"]}
+                cards = list(mongo_service.get_db()["cards"].find(card_filter, {"board": 1}))
+                board_ids = list({c["board"] for c in cards if c.get("board")})
+                if board_ids:
+                    other_conds = [c for c in conds if "members" not in c and "status" not in c]
+                    new_conds = [{"_id": {"$in": board_ids}}] + other_conds
+                    flt = {"$and": new_conds} if len(new_conds) > 1 else new_conds[0]
+                    total = _count(collection, flt)
+                    notes.append("Resolved projects via tasks assigned to team members in 'cards'.")
+        if total == 0:
+            return None                       # probably a mis-read question: let similarity search try instead
     wanted = 10 if plan["operation"] == "count" else settings.STRUCT_MAX_RECORDS
     cursor = collection.find(flt)
     if "createdAt" in info.get("fields", {}):
