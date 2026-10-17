@@ -201,7 +201,9 @@ Rules:
     In 'cards', board references 'boards', assignees reference 'users' (field 'assignees'), and workspace is 'workspaceId'.
   * "roles" refers to the 'roles' collection (e.g. Employee, Manager, Admin).
   * Questions like "tasks assigned to <person>", "pending tasks for <person>", or "<person>'s pending activities" -> query 'cards' collection with filter {"field": "assignees", "op": "eq", "value": "<person>"}, {"field": "status", "op": "ne", "value": "done"}, {"field": "status", "op": "ne", "value": "completed"}, show ["title", "status", "board"].
+  * Questions like "last logged time of <person>", "logged time for <person>", or "timesheet of <person>" -> query 'activities' collection with filter {"field": "user", "op": "eq", "value": "<person>"}, {"field": "type", "op": "eq", "value": "time_logged"}, show ["description", "card", "board", "createdAt"].
   * For 'cards' (tasks/activities), always include "board" in show so the project name is displayed for each card.
+  * For 'activities', always include ["description", "card", "board", "createdAt"] in show so the task, project, and time are displayed.
 - "list" for questions wanting items (list, show, which, all, what are); "count" for "how many".
 - Add a filter for every condition. Prefer values matching the catalog's sample values.
 - A field described as a reference is filtered by the referenced record's NAME, e.g.

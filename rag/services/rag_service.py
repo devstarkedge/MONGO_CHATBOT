@@ -26,13 +26,65 @@ _answer_cache = cache_service.TTLCache(settings.CACHE_MAX_ENTRIES, settings.CACH
 
 # Questions that expect SEVERAL answers. They automatically retrieve more records (LIST_TOP_K).
 LIST_PATTERN = re.compile(
-    r"\b(?:all|every|each|list|enumerate|how many|show me|give me|what are|who are|"
-    r"which\s+(?!is\b|are\b)\w{3,}s?)\b", re.IGNORECASE)
+    r"\b(?:all|every|each|list|enumerate|how many|show me|give me|give|tell me|what are|who are|"
+    r"can you|last|latest|recent|when did|status of|what was|what is|which\s+(?!is\b|are\b)\w{3,}s?)\b", re.IGNORECASE)
 
 
 
 def is_list_question(question: str) -> bool:
     return bool(LIST_PATTERN.search(question))
+
+
+GREETING_WORDS = {
+    "hello", "hi", "hey", "hiya", "greetings", "namaste", "hola",
+    "good morning", "good afternoon", "good evening", "good day",
+    "hey there", "hello there", "hi there"
+}
+
+HOW_ARE_YOU_WORDS = {
+    "how are you", "how are you doing", "how is it going", "hows it going",
+    "how do you do", "what is up", "whats up", "wassup"
+}
+
+THANKS_WORDS = {
+    "thanks", "thank you", "thank you so much", "thanks a lot", "thx",
+    "many thanks", "appreciate it"
+}
+
+GOODBYE_WORDS = {
+    "bye", "goodbye", "see you", "see ya", "take care", "cya", "good night", "have a good day"
+}
+
+CAPABILITIES_WORDS = {
+    "who are you", "what are you", "what can you do", "help", "help me",
+    "what do you do", "what is this", "what is this app"
+}
+
+
+def check_conversational(question: str) -> str | None:
+    cleaned = " ".join(re.sub(r"[^a-z0-9\s]", "", question.lower()).split())
+    if not cleaned:
+        return None
+    if cleaned in GREETING_WORDS:
+        return "Hello! How can I help you today? You can ask me about employees, workspaces, projects, tasks, departments, or other data in the database."
+    if cleaned in HOW_ARE_YOU_WORDS:
+        return "I'm doing well, thank you! How can I assist you with your projects, employees, or database records today?"
+    if cleaned in THANKS_WORDS:
+        return "You're welcome! Let me know if you need any other information from the database."
+    if cleaned in GOODBYE_WORDS:
+        return "Goodbye! Have a great day ahead. Feel free to come back whenever you need database insights."
+    if cleaned in CAPABILITIES_WORDS:
+        return ("I am your MongoDB database assistant. You can ask me to list employees, "
+                "check assigned tasks, view departments, inspect projects, or count records.")
+    return None
+
+
+def strip_greeting(text: str) -> str:
+    cleaned = re.sub(
+        r"^(?:hello|hi|hey|good\s+(?:morning|afternoon|evening)|greetings|namaste)\b[\s,!:\.\-]*",
+        "", text, flags=re.IGNORECASE
+    ).strip()
+    return cleaned or text
 
 
 def validate_question(question) -> str:
@@ -148,13 +200,27 @@ def ask(question, top_k=None, collections=None, hops=None, session_id=None) -> d
     question = validate_question(question)
     if session_id is not None and (not isinstance(session_id, str) or not re.fullmatch(r"[A-Fa-f0-9-]{1,64}", session_id)):
         raise InvalidRequestError("'session_id' must be a valid session identifier.")
+    conversational = check_conversational(question)
+    if conversational is not None:
+        result = {
+            "question": question,
+            "answer": conversational,
+            "sources": [],
+            "cached": False,
+            "mode": "conversational",
+            "timings_ms": {"total": 0}
+        }
+        _remember(session_id, question, result)
+        return result
+
     history = chat_memory.get(session_id) if session_id else []
+    query_text = strip_greeting(question)
     top_k = top_k or settings.TOP_K
-    list_mode = bool(settings.LIST_TOP_K) and is_list_question(question)
+    list_mode = bool(settings.LIST_TOP_K) and is_list_question(query_text)
     if list_mode:
         top_k = max(top_k, settings.LIST_TOP_K)     # never fewer than the user's mode, more for list questions
-    if settings.STRUCTURED_QUERIES and not collections and (list_mode or structured_query.mentions_collection(question)):
-        exact = structured_query.try_structured(question)    # exact totals straight from MongoDB
+    if settings.STRUCTURED_QUERIES and not collections and (list_mode or structured_query.mentions_collection(query_text)):
+        exact = structured_query.try_structured(query_text)    # exact totals straight from MongoDB
         if exact is not None:
             result = _exact_answer(question, exact, history)
             _remember(session_id, question, result)

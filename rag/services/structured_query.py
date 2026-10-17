@@ -364,6 +364,10 @@ def validate_plan(plan, catalog: dict):
     show = [f for f in (plan.get("show") or []) if isinstance(f, str) and f in valid][:MAX_SHOW]   # display only
     if collection == "cards" and show and "board" not in show and "board" in valid:
         show.append("board")
+    if collection == "activities" and show:
+        for f in ("card", "board", "createdAt"):
+            if f in valid and f not in show and len(show) < MAX_SHOW:
+                show.append(f)
     return {"collection": collection, "operation": operation, "filters": clean, "show": show}
 
 
@@ -513,7 +517,12 @@ def execute(plan: dict, catalog: dict, source: str):
     if total == 0 and conds:
         return None                       # probably a mis-read question: let similarity search try instead
     wanted = 10 if plan["operation"] == "count" else settings.STRUCT_MAX_RECORDS
-    cursor = collection.find(flt).limit(wanted)
+    cursor = collection.find(flt)
+    if "createdAt" in info.get("fields", {}):
+        cursor = cursor.sort("createdAt", -1)
+    else:
+        cursor = cursor.sort("_id", -1)
+    cursor = cursor.limit(wanted)
     try:
         cursor = cursor.max_time_ms(settings.STRUCT_TIMEOUT_MS)
     except Exception:

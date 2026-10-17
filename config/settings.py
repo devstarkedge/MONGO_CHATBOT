@@ -197,6 +197,12 @@ DEFAULT_COLLECTION_ALIASES = {
     "teams": "workspaces",
     "membership": "workspacememberships",
     "memberships": "workspacememberships",
+    "time": "activities",
+    "logged": "activities",
+    "timesheet": "activities",
+    "hours": "activities",
+    "activity": "activities",
+    "activities": "activities",
 }
 COLLECTION_ALIASES = DEFAULT_COLLECTION_ALIASES.copy()
 if os.getenv("COLLECTION_ALIASES"):
