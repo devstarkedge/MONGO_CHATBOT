@@ -18,6 +18,7 @@ Speed notes: the slow parts (probing which collection each id field points to, s
 the field list) happen once, at ingest, and are saved. A question then costs one planner call (cached for
 repeated questions), one count, one find and the answer call. Time is reported as plan / db / llm.
 """
+import difflib
 import json
 import logging
 import re
@@ -391,17 +392,43 @@ def _ids_by_name(target: str, value: str) -> list:
     ids = []
     for doc in mongo_service.get_db()[target].find(cond, {"_id": 1}).limit(50):
         ids.extend([doc["_id"], str(doc["_id"])])
-    if not ids and len(tokens) == 1 and len(tokens[0]) >= 4:
-        norm_token = _norm(tokens[0])
+
+    # If no exact word match, try compound-word matching or typo/fuzzy matching
+    if not ids and len(tokens) == 1 and len(tokens[0]) >= 3:
+        token = tokens[0].lower()
+        norm_token = _norm(token)
         projection = {"_id": 1, **{f: 1 for f in fields}}
+        candidates = []
         for doc in mongo_service.get_db()[target].find({}, projection).limit(100):
-            matched = False
+            best_score = 0.0
             for f in fields:
                 val = doc.get(f)
-                if isinstance(val, str) and (norm_token in _norm(val) or _norm(val) in norm_token):
-                    ids.extend([doc["_id"], str(doc["_id"])])
-                    matched = True
-                    break
+                if not isinstance(val, str) or not val.strip():
+                    continue
+                clean_val = val.strip().lower()
+                norm_val = _norm(val)
+                # 1. Compound word match (e.g. 'starkedge' inside 'starkedgeteam')
+                if len(norm_val) >= 4 and len(norm_token) >= 4:
+                    if norm_token in norm_val:
+                        best_score = max(best_score, 0.95)
+                    elif norm_val in norm_token and len(norm_val) >= len(norm_token) * 0.8:
+                        best_score = max(best_score, 0.90)
+                # 2. Fuzzy / typo match on individual words (e.g. 'shuham' vs 'shubham')
+                for w in re.findall(r"\w+", clean_val):
+                    if len(w) >= 3:
+                        ratio = difflib.SequenceMatcher(None, token, w).ratio()
+                        if ratio > best_score:
+                            best_score = ratio
+            if best_score >= 0.80:
+                candidates.append((best_score, doc["_id"]))
+
+        if candidates:
+            candidates.sort(key=lambda x: x[0], reverse=True)
+            top_score = candidates[0][0]
+            top_ids = [c[1] for c in candidates if c[0] >= top_score - 0.05]
+            for doc_id in top_ids:
+                ids.extend([doc_id, str(doc_id)])
+
     _name_ids.set(key, ids)
     return ids
 
