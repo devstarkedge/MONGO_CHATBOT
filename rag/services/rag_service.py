@@ -28,7 +28,8 @@ _answer_cache = cache_service.TTLCache(settings.CACHE_MAX_ENTRIES, settings.CACH
 LIST_PATTERN = re.compile(
     r"\b(?:all|every|each|list|enumerate|how many|show me|give me|give|tell me|what are|who are|"
     r"can you|last|latest|recent|when did|status of|what was|what is|which\s+(?!is\b|are\b)\w{3,}s?|"
-    r"completed|complete|done|finished|total)\b", re.IGNORECASE)
+    r"what did|what has|what have|what does|completed|complete|done|finished|total|"
+    r"progress|performance|working|overview|assigned)\b", re.IGNORECASE)
 
 
 
