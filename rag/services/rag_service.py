@@ -27,7 +27,8 @@ _answer_cache = cache_service.TTLCache(settings.CACHE_MAX_ENTRIES, settings.CACH
 # Questions that expect SEVERAL answers. They automatically retrieve more records (LIST_TOP_K).
 LIST_PATTERN = re.compile(
     r"\b(?:all|every|each|list|enumerate|how many|show me|give me|give|tell me|what are|who are|"
-    r"can you|last|latest|recent|when did|status of|what was|what is|which\s+(?!is\b|are\b)\w{3,}s?)\b", re.IGNORECASE)
+    r"can you|last|latest|recent|when did|status of|what was|what is|which\s+(?!is\b|are\b)\w{3,}s?|"
+    r"completed|complete|done|finished|total)\b", re.IGNORECASE)
 
 
 
@@ -81,7 +82,7 @@ def check_conversational(question: str) -> str | None:
 
 def strip_greeting(text: str) -> str:
     cleaned = re.sub(
-        r"^(?:hello|hi|hey|good\s+(?:morning|afternoon|evening)|greetings|namaste)\b[\s,!:\.\-]*",
+        r"^(?:hello|hlo|hi|hey|good\s+(?:morning|afternoon|evening)|greetings|namaste)\b[\s,!:\.\-]*",
         "", text, flags=re.IGNORECASE
     ).strip()
     return cleaned or text
