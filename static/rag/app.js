@@ -25,6 +25,7 @@
     const MARK = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 2.5l8.2 4.75v9.5L12 21.5l-8.2-4.75v-9.5z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/></svg>';
     const COPY = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>';
     const EDIT = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+    const SPARKLE_SEARCH = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 1.8 5.4a2 2 0 0 0 1.4 1.4L20.6 11.6l-5.4 1.8a2 2 0 0 0-1.4 1.4L12 20.2l-1.8-5.4a2 2 0 0 0-1.4-1.4L3.4 11.6l5.4-1.8a2 2 0 0 0 1.4-1.4Z"/></svg>';
     function staticSvg(markup, cls) {
         const span = h("span", { class: cls });
         span.innerHTML = markup; // constant markup written in this file, never user data
@@ -352,7 +353,44 @@
     }
 
     function addTyping() {
-        const msg = addBot({ body: h("div", { class: "typing", role: "status", "aria-label": "Looking up an answer" }, h("i"), h("i"), h("i")) });
+        const textSpan = h("span", { class: "thinking-label" }, "Searching database…");
+        const iconSpan = staticSvg(SPARKLE_SEARCH, "thinking-icon");
+        const pulseRing = h("span", { class: "thinking-ring" });
+        const iconWrap = h("span", { class: "thinking-icon-wrap" }, iconSpan, pulseRing);
+        const badge = h("div", { class: "thinking-badge" }, iconWrap, textSpan);
+        const wave = h("div", { class: "thinking-wave", "aria-hidden": "true" },
+            h("span", { class: "tw-bar" }),
+            h("span", { class: "tw-bar" }),
+            h("span", { class: "tw-bar" }),
+            h("span", { class: "tw-bar" })
+        );
+        const card = h("div", { class: "thinking-box", role: "status", "aria-label": "Searching and analyzing records" },
+            badge,
+            wave
+        );
+        const msg = addBot({ body: card });
+
+        const stages = [
+            "Searching database…",
+            "Analyzing collections & schema…",
+            "Connecting records & details…",
+            "Synthesizing response…"
+        ];
+        let stageIdx = 0;
+        const timer = setInterval(() => {
+            stageIdx = (stageIdx + 1) % stages.length;
+            textSpan.classList.add("fade-out");
+            setTimeout(() => {
+                textSpan.textContent = stages[stageIdx];
+                textSpan.classList.remove("fade-out");
+            }, 200);
+        }, 1800);
+
+        const origRemove = msg.remove.bind(msg);
+        msg.remove = () => {
+            clearInterval(timer);
+            origRemove();
+        };
         return msg;
     }
 
