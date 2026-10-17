@@ -246,7 +246,8 @@ Rules:
        - For completed/done/finished work or projects: add filter {"field": "status", "op": "in", "value": ["done", "completed"]}.
        - For pending/active work or tasks: add filters {"field": "status", "op": "ne", "value": "done"}, {"field": "status", "op": "ne", "value": "completed"}.
        - For general work / all tasks / "what did <person> do": do NOT filter by status (returns all their assigned cards).
-       - Always include ["title", "status", "board"] in show so the task title, status, and parent project name (board) are displayed.
+       - If the user asks for tasks with their logged time, hours, or "all data like logged time" (e.g. "tasks logged time of <person>", "all projects with all data like logged time"): include ["title", "status", "board", "loggedTime"] in show so the task title, project, status, and logged time hours are all displayed.
+       - Otherwise, include ["title", "status", "board"] in show so the task title, status, and parent project name (board) are displayed.
   * "sales", "leads", "bids", "bidding", or "proposals" refers to the 'salesrows' collection (stores client bid history, technology pitched, platforms like Upwork, clientBudget, clientLocation, replyFromClient, monthName).
     Example: "bids on Upwork" -> {"collection": "salesrows", "operation": "list", "filters": [{"field": "platform", "op": "contains", "value": "Upwork"}], "show": ["name", "technology", "clientBudget", "clientLocation"]}
     Example: "how many bids in September" -> {"collection": "salesrows", "operation": "count", "filters": [{"field": "monthName", "op": "contains", "value": "September"}]}

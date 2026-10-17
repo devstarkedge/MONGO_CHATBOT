@@ -214,6 +214,24 @@ def convert_document(collection: str, doc: dict, resolver=None) -> Converted:
     walker.walk(doc, "", "", 0)
     primary = str(doc.get("_id", ""))
     lines = list(walker.lines)
+    if collection == "cards" and doc.get("loggedTime"):
+        lt_entries = doc.get("loggedTime") or []
+        user_totals = {}
+        for lt in lt_entries:
+            if isinstance(lt, dict):
+                u_id = str(lt.get("user", ""))
+                mins = (lt.get("hours") or 0) * 60 + (lt.get("minutes") or 0)
+                user_totals[u_id] = user_totals.get(u_id, 0) + mins
+        tot_mins = sum(user_totals.values())
+        summary_lines = [f"Total Logged Time: {tot_mins//60}h {tot_mins%60}m ({len(lt_entries)} entries)"]
+        for u_id, m in user_totals.items():
+            u_name = None
+            if resolver and u_id:
+                u_name = resolver.lookup("cards", "loggedTime.user", u_id)
+            if not u_name:
+                u_name = "User"
+            summary_lines.append(f"Logged Time by {u_name}: {m//60}h {m%60}m")
+        lines = summary_lines + lines
     if lines:  # only add the framing lines when there is real content
         lines = [f"Document ID: {primary}", _summary(collection, walker.rels)] + lines
     return Converted(primary_id=primary, lines=lines, field_names=walker.fields,

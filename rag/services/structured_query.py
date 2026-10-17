@@ -528,7 +528,21 @@ def _labels_for(show: list) -> list:
 
 
 def _select_lines(lines: list, labels: list) -> list:
-    kept = [l for l in lines if any(l.startswith(lab + ":") or l.startswith(lab + " ID") for lab in labels)]
+    patterns = []
+    for lab in labels:
+        words = lab.split()
+        if len(words) > 1:
+            p = r"^" + r"(?:\s+\d+)?\s+".join(re.escape(w) for w in words) + r"(?:\s+\d+)?\s*(?::|\s+ID\b)"
+        else:
+            p = r"^" + re.escape(lab) + r"(?:\s+\d+)?\s*(?::|\s+ID\b)"
+        patterns.append(re.compile(p, re.IGNORECASE))
+    has_time_label = any("logged" in lab.lower() or "time" in lab.lower() for lab in labels)
+    kept = []
+    for l in lines:
+        if any(pat.search(l) for pat in patterns):
+            kept.append(l)
+        elif has_time_label and (l.startswith("Total Logged Time:") or l.startswith("Logged Time by ")):
+            kept.append(l)
     return kept or lines
 
 
