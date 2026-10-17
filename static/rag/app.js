@@ -372,9 +372,9 @@
 
         const stages = [
             "Searching database…",
-            "Analyzing collections & schema…",
-            "Connecting records & details…",
-            "Synthesizing response…"
+            "Analyzing collections…",
+            "Connecting records…",
+            "Generating response…"
         ];
         let stageIdx = 0;
         const timer = setInterval(() => {
