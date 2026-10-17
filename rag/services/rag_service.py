@@ -246,7 +246,11 @@ def ask(question, top_k=None, collections=None, hops=None, session_id=None) -> d
     hits = retrieval.search(_retrieval_query(question, history), top_k=top_k, collections=collections)
     mark("search")
     if not hits:
-        result = {"question": question, "answer": NOT_FOUND_ANSWER, "sources": [], "cached": False,
+        fallback_msg = (
+            f"{NOT_FOUND_ANSWER} You can ask me about team members, active projects, tasks, "
+            "departments, logged hours, sales leads, or company announcements!"
+        )
+        result = {"question": question, "answer": fallback_msg, "sources": [], "cached": False,
                   "timings_ms": timings}
         _remember(session_id, question, result)
         return result
@@ -259,8 +263,11 @@ def ask(question, top_k=None, collections=None, hops=None, session_id=None) -> d
                                   history=history)
     mark("llm")
 
-    not_found = answer.lower().startswith(NOT_FOUND_ANSWER.lower().rstrip("."))
-    sources = [] if not_found else (
+    is_pure_refusal = (
+        len(answer.strip()) < 90 and
+        answer.lower().startswith(NOT_FOUND_ANSWER.lower().rstrip("."))
+    )
+    sources = [] if is_pure_refusal else (
         [_source(g) for g in main_done] + [_source(g, related=True) for g in related_done])
     result = {"question": question, "answer": answer, "sources": sources, "cached": False,
               "records_used": len(main_done), "list_mode": list_mode, "timings_ms": timings}

@@ -246,7 +246,9 @@ def build_catalog(force: bool = False, resolver=None) -> dict:
 
 CORE_COLLECTIONS = (
     "workspaces", "users", "workspacememberships", "departments",
-    "boards", "cards", "roles", "activities", "lists", "tasks", "projects"
+    "boards", "cards", "roles", "activities", "lists", "tasks", "projects",
+    "salesrows", "announcements", "milestones", "subtasks", "comments",
+    "attachments", "holidays", "notifications"
 )
 
 NOISY_FIELD_PREFIXES = (
