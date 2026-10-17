@@ -244,8 +244,6 @@ button { font: inherit; color: inherit; }
   gap: 14px;
   padding: 3px 2px;
   user-select: none;
-  width: 275px;
-  max-width: 100%;
 }
 .thinking-badge {
   position: relative;
@@ -258,8 +256,6 @@ button { font: inherit; color: inherit; }
   border: 1px solid rgba(154, 47, 208, 0.22);
   box-shadow: 0 2px 14px rgba(122, 85, 236, 0.1);
   overflow: hidden;
-  flex: 1;
-  min-width: 0;
 }
 .thinking-badge::after {
   content: "";
@@ -303,10 +299,8 @@ button { font: inherit; color: inherit; }
   color: var(--violet);
   letter-spacing: -0.01em;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: inline-block;
   transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-block;
 }
 .thinking-label.fade-out {
   opacity: 0;
