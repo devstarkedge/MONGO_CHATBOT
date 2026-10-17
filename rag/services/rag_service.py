@@ -203,6 +203,75 @@ AFFIRMATIVE_WORDS = {
     "go ahead", "do that", "yes do that", "tell me", "show me", "check", "check it"
 }
 
+MONTH_NAMES = {
+    "january", "february", "march", "april", "may", "june",
+    "july", "august", "september", "october", "november", "december"
+}
+
+
+def resolve_contextual_query(question: str, history: list) -> str:
+    """
+    Transforms conversational follow-ups into complete, standalone queries.
+    Handles:
+    - Affirmative follow-ups ('yes', 'sure', 'please') -> expands prior request
+    - Entity switching ('and for Shubham?', 'what about Manoj?') -> preserves action/intent
+    - Timeframe drill-downs ('what about June?', 'in July') -> filters prior query
+    - Pronoun resolution ('his tasks', 'her projects', 'did he complete any work?')
+    """
+    if not history:
+        return question
+
+    last_turn = history[-1]
+    last_q = last_turn.get("question", "")
+    last_a = last_turn.get("answer", "")
+    cleaned = strip_greeting(question).strip()
+    cleaned_lower = cleaned.lower().rstrip(".!?")
+
+    # 1. Affirmative follow-ups
+    if cleaned_lower in AFFIRMATIVE_WORDS:
+        return f"Provide the specific dates, breakdown, and full details for: {last_q}"
+
+    # Extract target person from previous turn
+    prev_person = None
+    m_name = re.search(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:'s|\b)", last_q)
+    if m_name and m_name.group(1).lower() not in {"what", "how", "give", "list", "show", "tell", "which", "all", "check", "provide"}:
+        prev_person = m_name.group(1).strip()
+    if not prev_person and last_a:
+        m_ans = re.search(r"\b([A-Z][a-z]+\s+[A-Z][a-z]+)\b", last_a[:200])
+        if m_ans and m_ans.group(1).lower() not in {"stark edge", "full leave", "halfday leave", "short leave"}:
+            prev_person = m_ans.group(1).strip()
+
+    # 2. Pronoun resolution
+    pronoun_pattern = re.compile(r"\b(his|her|he|she|him)\b", re.IGNORECASE)
+    if prev_person and pronoun_pattern.search(cleaned):
+        def _replace_pronoun(m):
+            w = m.group(1).lower()
+            return f"{prev_person}'s" if w in ("his", "her") else prev_person
+        return pronoun_pattern.sub(_replace_pronoun, cleaned)
+
+    # 3. Person switching (e.g. "and for Shubham?", "what about Manoj?", "how about Pooja?")
+    m_switch = re.match(r"^(?:and\s+for|what\s+about|how\s+about|and|for)\s+([A-Za-z\s]+?)\??$", cleaned, re.IGNORECASE)
+    if m_switch:
+        candidate_person = m_switch.group(1).strip()
+        # Avoid treating months or generic words as person names
+        if candidate_person.lower() not in MONTH_NAMES and len(candidate_person.split()) <= 3:
+            if any(w in last_q.lower() for w in ("leave", "leaves", "time off", "vacation")):
+                return f"give me {candidate_person}'s leave all data"
+            if any(w in last_q.lower() for w in ("completed", "finish", "done")):
+                return f"give me {candidate_person}'s completed tasks and projects"
+            if any(w in last_q.lower() for w in ("task", "tasks", "work", "projects", "activities", "logged")):
+                return f"give me {candidate_person}'s tasks and projects"
+            return f"give details and work for {candidate_person}"
+
+    # 4. Month or timeframe drill-down (e.g. "what about June?", "in June", "for August 2026")
+    for m in MONTH_NAMES:
+        if m in cleaned_lower:
+            tokens = cleaned_lower.split()
+            if len(tokens) <= 5:
+                return f"{last_q} in {m.capitalize()}"
+
+    return cleaned or question
+
 
 def ask(question, top_k=None, collections=None, hops=None, session_id=None) -> dict:
     question = validate_question(question)
@@ -222,13 +291,8 @@ def ask(question, top_k=None, collections=None, hops=None, session_id=None) -> d
         return result
 
     history = chat_memory.get(session_id) if session_id else []
-    query_text = strip_greeting(question)
-    cleaned_lower = query_text.lower().strip().rstrip(".!?")
-    if cleaned_lower in AFFIRMATIVE_WORDS and history:
-        last_turn = history[-1]
-        last_q = last_turn.get("question", "")
-        query_text = f"Provide the specific dates, breakdown, and full details for: {last_q}"
-        question = query_text
+    query_text = resolve_contextual_query(question, history)
+    question = query_text
     top_k = top_k or settings.TOP_K
     list_mode = bool(settings.LIST_TOP_K) and is_list_question(query_text)
     if list_mode:

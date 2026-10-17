@@ -393,13 +393,13 @@ def _ids_by_name(target: str, value: str) -> list:
     for doc in mongo_service.get_db()[target].find(cond, {"_id": 1}).limit(50):
         ids.extend([doc["_id"], str(doc["_id"])])
 
-    # If no exact word match, try compound-word matching or typo/fuzzy matching
-    if not ids and len(tokens) == 1 and len(tokens[0]) >= 3:
-        token = tokens[0].lower()
-        norm_token = _norm(token)
+    # If no exact word match, try compound-word matching or typo/fuzzy matching across tokens
+    if not ids and tokens:
+        token_strs = [t.lower() for t in tokens if len(t) >= 2]
+        full_val_norm = _norm(" ".join(token_strs))
         projection = {"_id": 1, **{f: 1 for f in fields}}
         candidates = []
-        for doc in mongo_service.get_db()[target].find({}, projection).limit(100):
+        for doc in mongo_service.get_db()[target].find({}, projection).limit(150):
             best_score = 0.0
             for f in fields:
                 val = doc.get(f)
@@ -407,19 +407,30 @@ def _ids_by_name(target: str, value: str) -> list:
                     continue
                 clean_val = val.strip().lower()
                 norm_val = _norm(val)
-                # 1. Compound word match (e.g. 'starkedge' inside 'starkedgeteam')
-                if len(norm_val) >= 4 and len(norm_token) >= 4:
-                    if norm_token in norm_val:
-                        best_score = max(best_score, 0.95)
-                    elif norm_val in norm_token and len(norm_val) >= len(norm_token) * 0.8:
-                        best_score = max(best_score, 0.90)
-                # 2. Fuzzy / typo match on individual words (e.g. 'shuham' vs 'shubham')
-                for w in re.findall(r"\w+", clean_val):
-                    if len(w) >= 3:
-                        ratio = difflib.SequenceMatcher(None, token, w).ratio()
+                # 1. Full normalized string similarity or compound match
+                if full_val_norm and norm_val:
+                    if full_val_norm == norm_val:
+                        best_score = 1.0
+                    elif full_val_norm in norm_val or norm_val in full_val_norm:
+                        best_score = max(best_score, 0.92)
+                    else:
+                        ratio = difflib.SequenceMatcher(None, full_val_norm, norm_val).ratio()
                         if ratio > best_score:
                             best_score = ratio
-            if best_score >= 0.80:
+                # 2. Token-by-token matching across document words
+                doc_words = [w.lower() for w in re.findall(r"\w+", clean_val)]
+                if doc_words and token_strs:
+                    token_scores = []
+                    for t in token_strs:
+                        m_score = max((difflib.SequenceMatcher(None, t, dw).ratio() for dw in doc_words), default=0.0)
+                        if any(t in dw or dw in t for dw in doc_words if len(t) >= 4):
+                            m_score = max(m_score, 0.90)
+                        token_scores.append(m_score)
+                    if token_scores:
+                        avg_token_score = sum(token_scores) / len(token_scores)
+                        if min(token_scores) >= 0.70 and avg_token_score > best_score:
+                            best_score = avg_token_score
+            if best_score >= 0.75:
                 candidates.append((best_score, doc["_id"]))
 
         if candidates:
@@ -672,6 +683,12 @@ def execute(plan: dict, catalog: dict, source: str):
     resolver.prefetch(name, docs, infer=False)      # names only: targets are already known
     labels = _labels_for(plan.get("show") or [])
     target_uid, target_user_name = None, None
+    target_month = None
+    q_str = plan.get("_question", "")
+    for m in ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"):
+        if re.search(rf"\b{m}\b", q_str, re.IGNORECASE):
+            target_month = m.capitalize()
+            break
     if name == "cards":
         u_f = next((f for f in plan.get("filters", []) if f.get("field") in ("assignees", "user") and f.get("op") in ("eq", "contains")), None)
         if u_f:
@@ -680,6 +697,10 @@ def execute(plan: dict, catalog: dict, source: str):
             u_doc = db_tmp["users"].find_one({"name": re.compile(f"^{re.escape(target_user_name)}$", re.IGNORECASE)})
             if not u_doc:
                 u_doc = db_tmp["users"].find_one({"name": re.compile(re.escape(target_user_name), re.IGNORECASE)})
+            if not u_doc:
+                fuzzy_ids = _ids_by_name("users", target_user_name)
+                if fuzzy_ids:
+                    u_doc = db_tmp["users"].find_one({"_id": fuzzy_ids[0]})
             if u_doc:
                 target_uid = u_doc["_id"]
                 target_user_name = u_doc.get("name", target_user_name)
@@ -691,17 +712,20 @@ def execute(plan: dict, catalog: dict, source: str):
             body = _select_lines(body, labels)
         if name == "cards" and target_uid and doc.get("loggedTime"):
             u_lts = [lt for lt in doc.get("loggedTime", []) if lt.get("user") == target_uid]
+            if target_month:
+                u_lts = [lt for lt in u_lts if lt.get("date") and hasattr(lt["date"], "strftime") and lt["date"].strftime("%B").lower() == target_month.lower()]
             tot_mins = sum((lt.get("hours") or 0) * 60 + (lt.get("minutes") or 0) for lt in u_lts)
             dates = []
             for lt in u_lts:
                 d = lt.get("date")
                 if d and hasattr(d, "strftime"):
                     dates.append(f"{d.strftime('%B %d, %Y')} ({lt.get('hours', 0)}h {lt.get('minutes', 0)}m)")
+            m_label = f" in {target_month}" if target_month else ""
             if dates:
                 dates_str = f" across {len(u_lts)} dates: {'; '.join(dates)}"
-                user_lt_line = f"Logged Time for {target_user_name}: {tot_mins//60}h {tot_mins%60}m{dates_str}"
+                user_lt_line = f"Logged Time for {target_user_name}{m_label}: {tot_mins//60}h {tot_mins%60}m{dates_str}"
             else:
-                user_lt_line = f"Logged Time for {target_user_name}: 0h 0m (no logged entries)"
+                user_lt_line = f"Logged Time for {target_user_name}{m_label}: 0h 0m (no logged entries{m_label})"
             filtered_body = [l for l in body if not l.startswith("Logged Time by ") and not l.startswith("Total Logged Time:")]
             body = [user_lt_line] + filtered_body
         records.append({"document_id": conv.primary_id, "name": conv.display_name,
@@ -787,6 +811,7 @@ def try_structured(question: str, history: list = None):
                 plan, source = {"collection": name, "operation": "list", "filters": [], "show": []}, "name-match"
         if plan is None:
             return None
+        plan["_question"] = question
         result = execute(plan, catalog, source)
         if result is None:
             return None
